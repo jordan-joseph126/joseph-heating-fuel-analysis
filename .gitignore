@@ -1,0 +1,41 @@
+.DS_Store
+.vscode/
+authentification.js
+node_modules
+notes/
+**/*-todo.md
+
+# Archive
+archive/
+
+# Output folders
+outputs/
+
+# Large  data files
+data/
+
+# Python cache files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# Python virtual environments
+venv/
+env/
+ENV/
+
+# Python distribution / packaging
+build/
+dist/
+*.egg-info/
+
+# ============================================================================
+# KEEP DIRECTORY STRUCTURE
+# ============================================================================
+# Keep empty directories with .gitkeep files
+!**/.gitkeep

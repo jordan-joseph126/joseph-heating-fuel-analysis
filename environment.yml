@@ -1,0 +1,40 @@
+name: joseph-heating-fuel-env
+
+channels:
+  - conda-forge # Use conda-forge to avoid compilation issues with geospatial packages (fiona, shapely, pyproj, etc.)
+  - defaults    # Fallback to Anaconda official
+
+dependencies:
+  # Python version with explicit range
+  - python>=3.10,<3.13
+  
+  # Core data processing
+  - pandas>=1.3.0,<3.0
+  - numpy>=1.20.0,<2.0
+  
+  # Geospatial stack (critical to install via conda)
+  - geopandas>=0.10.0,<1.0
+  - fiona>=1.8.0
+  - shapely>=1.8.0,<3.0
+  - pyproj>=3.0.0
+  - rtree>=1.0.0
+  
+  # Visualization
+  - matplotlib>=3.4.0
+  - contextily>=1.1.0
+  - seaborn
+  
+  # Notebook environment
+  - jupyter
+  - jupyterlab
+  - ipykernel
+  - notebook
+
+# There are currently no pip-only packages required so this section is commented out. Uncomment and modify if needed.
+
+  # # Package manager (Must come BEFORE pip: section)
+  # - pip>=21.0
+
+  # # Pip packages (if any conda-unavailable packages needed)
+  # - pip:
+  #   # Add pip-only packages here if needed
