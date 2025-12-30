@@ -230,7 +230,7 @@ def plot_heating_fuel_map(
 
 
 # ============================================================================
-# COMPLETE MAP CREATION
+# CREATE SINGLE YEAR MAP
 # ============================================================================
 
 def create_heating_fuel_map(
@@ -309,7 +309,7 @@ def create_heating_fuel_map(
 
 
 # ===========================================================================
-# MULTI-YEAR GRID MAP CREATION
+# CREATE MULTI-YEAR GRID MAP
 # ============================================================================
 
 def create_heating_fuel_grid(
@@ -439,8 +439,8 @@ def create_heating_fuel_grid(
     fig.legend(
         handles=create_legend_elements(),
         title='Primary Heating Fuel (by census tract)',
-        loc='lower center',           # CHANGED: Use 'lower center' for bottom positioning
-        bbox_to_anchor=(0.5, -0.01),  # Just below figure bottom
+        loc='lower center',
+        bbox_to_anchor=(0.5, -0.01),
         ncol=7,
         fontsize=20,
         title_fontsize=22,

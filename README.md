@@ -43,7 +43,7 @@ The analysis processes raw NHGIS (National Historical Geographic Information Sys
 
 **Author:** Jordan M. Joseph, PhD   
 **Affiliation:** Carnegie Mellon University  
-**Contact for Support and Questions:** jordanjo@alumni.cmu.edu, jordanjoseph53@gmail.com
+**Contact for Support and Questions:** jordanjo@alumni.cmu.edu, jordanjoseph53@gmail.com  
 **For Repository Issues:** GitHub Issues page (for bug reports, feature requests)
 
 NOTE:
@@ -320,25 +320,25 @@ The raw data used in this study are publicly available from NHGIS under their da
 
 The data used in the data analysis workflow is publicly available on Zenodo under the GNU GPLv3 license. The data directory, organized in the appropriate file path structure, is available here: https://doi.org/10.5281/zenodo.17706631
 
-The Zenodo data folder contains the data required to run the joseph-heating-fuel-analysis GitHub repo code (not included in the Github repository). 
-[1]	Download the data from this page
-[2]	Extract all files from the zipped folder
-[3]	Copy and paste the folder contents in the empty folder at the following path: [YOUR_PATH]/joseph-heating-fuel-analysis
+The Zenodo data folder contains the data required to run the joseph-heating-fuel-analysis GitHub repo code (not included in the Github repository).  
+1. Download the data from this page  
+2. Extract all files from the zipped folder  
+3. Copy and paste the folder contents in the empty folder at the following path: [YOUR_PATH]/joseph-heating-fuel-analysis
 
 **OPTIONAL:** 
 If you choose to download the files (e.g., for a different 5-year dataset), be sure to read the note in the config.py file about updating the file paths. The data acquisition process is outlined below:
 
-[1]	Register for a free account at NHGIS (https://www.nhgis.org).
-[2]	Use the Data Finder to select:
--	Geographic level: Census Tract, State
--	Years: 2015 (2011-2015), 2020 (2016-2020), 2023 (2019-2023)
--	Topic: Heating, Cooling, and Fuels
-[3]	In the “SOURCE TABLES” tab under “SELECT DATA”:
--	Find the rows with Table: B25040 (House Heating Fuel) under Table Name and the listed “Year – Dataset” options of interest.
--	Click the green plus sign to the left of those rows.
-[4]	Then click the “GIS FILES” tab under “SELECT DATA” to add the 2015, 2020, and 2023 Census Tract shapefiles (TIGER/Line + under “BASIS”). Also, select one of the State options (we chose 2015).
-[5]	Click the “CONTINUE” button in the top right corner. Review the selections and click “CONTINUE” again. 
-[6]	Check the descriptive header row box and hit submit.
+1. Register for a free account at NHGIS (https://www.nhgis.org).   
+2. Use the Data Finder to select:
+    -	Geographic level: Census Tract, State
+    -	Years: 2015 (2011-2015), 2020 (2016-2020), 2023 (2019-2023)
+    -	Topic: Heating, Cooling, and Fuels
+3. In the “SOURCE TABLES” tab under “SELECT DATA”:
+    -	Find the rows with Table: B25040 (House Heating Fuel) under Table Name and the listed “Year – Dataset” options of interest.
+      -	Click the green plus sign to the left of those rows.
+4. Then click the “GIS FILES” tab under “SELECT DATA” to add the 2015, 2020, and 2023 Census Tract shapefiles (TIGER/Line + under “BASIS”). Also, select one of the State options (we chose 2015).
+5. Click the “CONTINUE” button in the top right corner. Review the selections and click “CONTINUE” again. 
+6. Check the descriptive header row box and hit submit.
 
 
 **Expected directory structure after extraction:**
@@ -469,7 +469,7 @@ code .
 
 ## 1.7 Troubleshooting
 
-### Conda Health Issues (Solver Errors)
+### ISSUE 1: Conda Health Issues (Solver Errors)
 
 **Symptoms:**
 - `conda env create` fails or shows warnings
@@ -480,7 +480,9 @@ code .
 
 This issue affects conda itself (base environment), not your project environment. Fix it in the base environment before creating project environments.
 
-### `code` Command Not Working in Anaconda Prompt
+---
+
+### ISSUE 2: `code` Command Not Working in Anaconda Prompt
 
 **Symptoms:** `code --version` works in Command Prompt but fails in Anaconda Prompt with "'code' is not recognized"
 
@@ -494,7 +496,9 @@ Close and reopen Anaconda Prompt. The `code` command should now work.
 
 **Why this happens:** Anaconda Prompt's initialization may not preserve system PATH entries. Running `conda init powershell` creates a proper PowerShell profile that preserves VS Code's PATH entry while adding conda directories.
 
-### `ModuleNotFoundError: No module named 'config'` or `'scripts'`
+---
+
+### ISSUE 3: `ModuleNotFoundError: No module named 'config'` or `'scripts'`
 
 **Cause:** Project package not installed in editable mode.
 
@@ -509,7 +513,9 @@ Then **restart the Jupyter kernel** in VS Code: Click kernel indicator → Resta
 
 **Why this happens:** Python needs to know where to find your project modules. `pip install -e .` tells Python "this directory contains importable packages."
 
-### Wrong Python Version
+---
+
+### ISSUE 4: Wrong Python Version
 
 **Cause:** Environment wasn't created correctly or wrong environment is active.
 
@@ -528,7 +534,9 @@ conda env create -f environment.yml
 
 Then repeat Steps 2-4 from Section 1.5.
 
-### Jupyter Kernel Not Available in VS Code
+---
+
+### ISSUE 5: Jupyter Kernel Not Available in VS Code
 
 **Solution:** Re-register the kernel
 ```bash
@@ -541,7 +549,9 @@ Then refresh VS Code's kernel list:
 - Run: **"Jupyter: Select Interpreter to Start Jupyter Server"**
 - Choose the joseph-heating-fuel-env environment
 
-### Kernel Crashes or Keeps Restarting
+---
+
+### ISSUE 6: Kernel Crashes or Keeps Restarting
 
 **Solutions:**
 1. Clear all kernels: `Ctrl+Shift+P` → "Jupyter: Clear All Kernels"
@@ -549,7 +559,9 @@ Then refresh VS Code's kernel list:
 3. Restart VS Code
 4. Reopen notebook and select kernel
 
-### VS Code Doesn't Detect Conda Environment
+---
+
+### ISSUE 7: VS Code Doesn't Detect Conda Environment
 
 **Primary solution:** Launch VS Code from Anaconda Prompt (see Section 1.6)
 
@@ -563,7 +575,9 @@ Then refresh VS Code's kernel list:
 - Mac: `/Users/YourName/anaconda3/envs/joseph-heating-fuel-env/bin/python`
 - Linux: `/home/YourName/anaconda3/envs/joseph-heating-fuel-env/bin/python`
 
-### Environment Creation Hangs or Takes Very Long
+---
+
+### ISSUE 8: Environment Creation Hangs or Takes Very Long
 
 **Cause:** Conda solver is working but struggling with dependency resolution (common with geospatial packages).
 
@@ -586,7 +600,9 @@ Then refresh VS Code's kernel list:
    conda env create -f environment.yml --channel conda-forge
    ```
 
-### GeoPandas / Fiona Installation Errors
+---
+
+### ISSUE 9: GeoPandas / Fiona Installation Errors
 
 **Cause:** Geospatial packages require compiled C libraries that can be difficult to build on Windows.
 
@@ -597,7 +613,9 @@ conda install -c conda-forge geopandas fiona shapely pyproj rtree
 
 The `conda-forge` channel provides pre-compiled binaries for Windows, avoiding compilation issues.
 
-### Data File Path Errors
+---
+
+### ISSUE 10: Data File Path Errors
 
 **Symptoms:** `FileNotFoundError` when running the notebook
 
@@ -679,23 +697,22 @@ python setup.py --version
 
 **License:** GNU GPLv3 license
 
-**Author:** Jordan M. Joseph, PhD
-**Affiliation:** Carnegie Mellon University
+**Author:** Jordan M. Joseph, PhD   
+**Affiliation:** Carnegie Mellon University   
 **Contact:** jordanjo@alumni.cmu.edu, jordanjoseph53@gmail.com
 
 **Citation (Suggested):**
 ```
-Joseph, J.M. (2025). Heating Fuel Analysis: Mapping Primary Residential Heating
-Fuels Across U.S. Census Tracts. Carnegie Mellon University.
+Joseph, J.M. (2025). Heating Fuel Analysis: Mapping Primary Residential Heating Fuels Across U.S. Census Tracts. Carnegie Mellon University.
 https://github.com/jordan-joseph126/joseph-heating-fuel-analysis
 ```
 
-**Data Availability**
+**Data Availability:**   
 The raw data used in this study are publicly available from NHGIS under their data use agreement. Registration is required but is free for research and educational purposes. 
 
 The data used in the data analysis workflow is publicly available on Zenodo under the GNU GPLv3 license. Zenodo repository: https://doi.org/10.5281/zenodo.17706631
 
-**Code Availability**
+**Code Availability:**   
 The analysis code and visualization tools are publicly available in the GitHub repository under the GNU GPLv3 license. 
 
 GitHub repository: https://github.com/jordan-joseph126/joseph-heating-fuel-analysis.git
@@ -718,9 +735,7 @@ GitHub repository: https://github.com/jordan-joseph126/joseph-heating-fuel-analy
 This analysis uses publicly available data from IPUMS NHGIS:
 
 ```
-Jonathan Schroeder, David Van Riper, Steven Manson, Katherine Knowles,
-Tracy Kugler, Finn Roberts, and Steven Ruggles. IPUMS National Historical
-Geographic Information System: Version 20.0 [dataset]. Minneapolis, MN:
+Jonathan Schroeder, David Van Riper, Steven Manson, Katherine Knowles, Tracy Kugler, Finn Roberts, and Steven Ruggles. IPUMS National Historical Geographic Information System: Version 20.0 [dataset]. Minneapolis, MN:
 IPUMS. 2025. http://doi.org/10.18128/D050.V20.0
 ```
 
