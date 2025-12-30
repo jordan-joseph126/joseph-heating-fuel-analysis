@@ -6,13 +6,19 @@ PROJECT_ROOT = os.path.abspath(os.path.dirname(__file__))
 
 print(f"Project root directory: {PROJECT_ROOT}")
 
-# ============================================================================
-# DATA PATHS
-# IMPORTANT!: 
-# 'nhgis0011' refers to the specific NHGIS download (11th download)
-# If you follow the directions for downloading the data yourself, ensure 
-# that the prefixes below match the folder/file from your downloaded data.
-# ============================================================================
+"""
+========== IMPORTANT NOTES BELOW! ==========
+If you download the data yourself, the download number and/or dataset codes
+may need to be updated here accordingly.
+
+Make sure that matching shapefiles are also downloaded for the same datasets!
+
+For example:
+'nhgis0011' refers to the specific NHGIS download (11th download)
+'ds215_20155', 'ds249_20205', and 'ds267_20235' are different NHGIS datasets 
+'20155', '20205', and '20235' indicate 5 year datasets: 2011-2015, 2016-2020, and 2019-2023
+'tract' indicates census tract level data
+"""
 
 # Raw NHGIS data (this is our starting point)
 RAW_DATA_DIR = os.path.join(PROJECT_ROOT, 'data', 'raw_data_and_codebook', 'nhgis0011_csv')

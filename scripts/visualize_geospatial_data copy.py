@@ -49,70 +49,6 @@ def detect_state_column(gdf: gpd.GeoDataFrame) -> str:
     )
 
 
-def split_state_boundaries(
-    gdf_states: gpd.GeoDataFrame
-) -> Tuple[gpd.GeoDataFrame, gpd.GeoDataFrame]:
-    """
-    Split state boundaries into CONUS and Alaska for mapping.
-    
-    Args:
-        gdf_states: GeoDataFrame with all state boundaries
-        
-    Returns:
-        Tuple of (state_conus, state_alaska) GeoDataFrames
-        
-    Raises:
-        ValueError: If state column not found
-    """
-    state_col = detect_state_column(gdf_states)
-    
-    state_conus = gdf_states[~gdf_states[state_col].isin(['AK', 'HI', 'PR'])]
-    state_alaska = gdf_states[gdf_states[state_col] == 'AK']
-    
-    return state_conus, state_alaska
-
-
-def save_figure(
-    fig: plt.Figure,
-    output_dir: str,
-    filename_base: str,
-    dpi: int = 600,
-    show_plot: bool = True,
-    verbose: bool = False
-) -> Tuple[str, str]:
-    """
-    Save matplotlib figure as PNG and PDF.
-    
-    Args:
-        fig: Matplotlib figure to save
-        output_dir: Directory for output files
-        filename_base: Base filename without extension
-        dpi: Resolution for PNG output
-        show_plot: Whether to display the plot
-        verbose: Print save location
-        
-    Returns:
-        Tuple of (png_path, pdf_path)
-    """
-    png_path = os.path.join(output_dir, f'{filename_base}.png')
-    pdf_path = os.path.join(output_dir, f'{filename_base}.pdf')
-    
-    if verbose:
-        print(f"  Saving to: {output_dir}")
-    
-    save_kwargs = {'bbox_inches': 'tight', 'facecolor': 'white'}
-    
-    fig.savefig(png_path, dpi=dpi, **save_kwargs)
-    fig.savefig(pdf_path, **save_kwargs)
-    
-    if show_plot:
-        plt.show()
-    else:
-        plt.close(fig)
-    
-    return png_path, pdf_path
-
-
 def create_legend_elements() -> List[Patch]:
     """Create legend patches for heating fuel types."""
     return [
@@ -163,7 +99,9 @@ def plot_heating_fuel_map(
         )
     
     # Split state boundaries by region
-    state_conus, state_alaska = split_state_boundaries(gdf_states)
+    state_col = detect_state_column(gdf_states)
+    state_ak = gdf_states[gdf_states[state_col] == 'AK']
+    state_conus = gdf_states[~gdf_states[state_col].isin(['AK', 'HI', 'PR'])]
     
     # Plot contiguous US
     if verbose:
@@ -210,7 +148,7 @@ def plot_heating_fuel_map(
             rasterized=True
         )
         
-        state_alaska.boundary.plot(
+        state_ak.boundary.plot(
             ax=ax_alaska,
             linewidth=0.8,
             edgecolor='black',
@@ -223,9 +161,7 @@ def plot_heating_fuel_map(
             'Alaska',
             transform=ax_alaska.transAxes,
             ha='center',
-            # Increased from 14 to 20 and made bold for better visibility
-            fontsize=20,
-            fontweight='bold'
+            fontsize=11
         )
 
 
@@ -287,29 +223,33 @@ def create_heating_fuel_map(
         handles=create_legend_elements(),
         title='Primary Heating Fuel\n(by census tract)',
         loc='center right',
-        # Moved legend lower to allow for larger text and avoid overlap. Originally (0.80, 0.55)
-        bbox_to_anchor=(0.78, 0.30),
+        bbox_to_anchor=(0.80, 0.55),
         bbox_transform=fig.transFigure,
-        # Increased from 11 to 16, and title from 12 to 17
-        fontsize=16,              
-        title_fontsize=17,
+        fontsize=11,
         frameon=True,
         edgecolor='black'
     )
     
-    # Save outputs (SIMPLIFIED - single function call)
-    return save_figure(
-        fig=fig,
-        output_dir=output_dir,
-        filename_base=f'heating_fuel_map_{year}',
-        dpi=dpi,
-        show_plot=show_plot,
-        verbose=verbose
-    )
+    # Save outputs
+    png_path = os.path.join(output_dir, f'heating_fuel_map_{year}.png')
+    pdf_path = os.path.join(output_dir, f'heating_fuel_map_{year}.pdf')
+    
+    if verbose:
+        print(f"  Saving to: {output_dir}")
+    
+    fig.savefig(png_path, dpi=dpi, bbox_inches='tight', facecolor='white')
+    fig.savefig(pdf_path, bbox_inches='tight', facecolor='white')
+    
+    if show_plot:
+        plt.show()
+    else:
+        plt.close(fig)
+    
+    return png_path, pdf_path
 
 
 # ===========================================================================
-# MULTI-YEAR GRID MAP CREATION
+# USAGE EXAMPLE
 # ============================================================================
 
 def create_heating_fuel_grid(
@@ -358,59 +298,61 @@ def create_heating_fuel_grid(
     os.makedirs(output_dir, exist_ok=True)
     
     # ============================================================
-    # CREATE FIGURE WITH AUTOMATIC SUBPLOT GRID
+    # CALCULATE LAYOUT GEOMETRY
     # ============================================================
     num_plots = len(years)
     
+    # Subplot dimensions (as fraction of figure)
+    subplot_width = 0.28      # 28% width per subplot
+    subplot_height = 0.70     # 70% height
+    top_margin = 0.08         # Space for overall title
+    bottom_margin = 0.15      # Space below maps
+    left_margin = 0.02        # Left edge buffer
+    spacing = 0.03            # Gap between subplots
+    
+    # Alaska inset dimensions (relative to each subplot)
+    alaska_width_ratio = 0.35   # 35% of subplot width
+    alaska_height_ratio = 0.35  # 35% of subplot height
+    
     if verbose:
         print(f"\nCreating {num_plots}-panel grid...")
-    
-    # Use matplotlib's built-in subplot grid (MUCH SIMPLER!)
-    fig, axes_main = plt.subplots(
-        nrows=1, 
-        ncols=num_plots,
-        figsize=figsize,
-        facecolor='white',
-        gridspec_kw={
-            'wspace': 0.05,    # Horizontal space between subplots (5%)
-            'hspace': 0.0      # No vertical space (single row)
-        }
-    )
-    
-    # Adjust margins to minimize white space
-    fig.subplots_adjust(
-        left=0.01,      # Minimal left margin
-        right=0.99,     # Minimal right margin  
-        top=0.98,       # Minimal top margin
-        bottom=0.08     # Space for legend at bottom
-    )
-    
-    # Convert to list if single subplot (for consistent indexing)
-    if num_plots == 1:
-        axes_main = [axes_main]
+        print(f"  Subplot dimensions: {subplot_width:.2%} × {subplot_height:.2%}")
     
     # ============================================================
-    # CREATE ALASKA INSETS (positioned relative to each subplot)
+    # CREATE FIGURE AND AXES
     # ============================================================
+    fig = plt.figure(figsize=figsize, facecolor='white')
+    
+    axes_main = []
     axes_alaska = []
     
-    if include_alaska:
-        for i, ax in enumerate(axes_main):
-            # Get subplot position in figure coordinates
-            bbox = ax.get_position()
+    for i, year in enumerate(years):
+        # Calculate left position for this subplot
+        left = left_margin + i * (subplot_width + spacing)
+        
+        # Create main map axes
+        ax_main = fig.add_axes([
+            left, 
+            bottom_margin, 
+            subplot_width, 
+            subplot_height
+        ])
+        axes_main.append(ax_main)
+        
+        # Create Alaska inset if requested
+        if include_alaska:
+            alaska_width = subplot_width * alaska_width_ratio
+            alaska_height = subplot_height * alaska_height_ratio
             
-            # Alaska inset: bottom-left corner of each subplot
-            # Width: 35% of subplot width
-            # Height: 35% of subplot height
             ax_alaska = fig.add_axes([
-                bbox.x0,                    # Left edge of subplot
-                bbox.y0,                    # Bottom edge of subplot
-                bbox.width * 0.35,          # 35% of subplot width
-                bbox.height * 0.35          # 35% of subplot height
+                left,
+                bottom_margin,
+                alaska_width,
+                alaska_height
             ])
             axes_alaska.append(ax_alaska)
-    else:
-        axes_alaska = [None] * num_plots
+        else:
+            axes_alaska.append(None)
     
     # ============================================================
     # PLOT EACH YEAR
@@ -422,6 +364,7 @@ def create_heating_fuel_grid(
         if verbose:
             print(f"\n  [{i+1}/{num_plots}] Year {year}")
         
+        # Use existing plot_heating_fuel_map() function
         plot_heating_fuel_map(
             gdf_conus=gdf_dict[year]['conus'],
             gdf_alaska=gdf_dict[year].get('alaska'),
@@ -434,34 +377,57 @@ def create_heating_fuel_grid(
         )
     
     # ============================================================
-    # ADD SHARED LEGEND (horizontal at bottom)
+    # ADD SHARED LEGEND (Figure-level)
     # ============================================================
+    # Position legend to the right of the last subplot
+    legend_x = left_margin + num_plots * (subplot_width + spacing) - spacing + 0.02
+    legend_y = 0.50  # Vertically centered
+    
     fig.legend(
         handles=create_legend_elements(),
-        title='Primary Heating Fuel (by census tract)',
-        loc='lower center',           # CHANGED: Use 'lower center' for bottom positioning
-        bbox_to_anchor=(0.5, -0.01),  # Just below figure bottom
-        ncol=7,
-        fontsize=20,
-        title_fontsize=22,
+        title='Primary Heating Fuel\n(by census tract)',
+        loc='center',
+        bbox_to_anchor=(legend_x, legend_y),
+        bbox_transform=fig.transFigure,
+        fontsize=11,
+        title_fontsize=12,
         frameon=True,
         edgecolor='black',
         fancybox=False
     )
     
     # ============================================================
-    # SAVE OUTPUTS (SIMPLIFIED - single function call)
+    # ADD OVERALL TITLE
+    # ============================================================
+    year_range = f"{min(years)}–{max(years)}"
+    fig.text(
+        0.5, 0.96,
+        f'Evolution of Primary Heating Fuels, {year_range}',
+        ha='center',
+        va='top',
+        fontsize=26,
+        fontweight='bold',
+        transform=fig.transFigure
+    )
+    
+    # ============================================================
+    # SAVE OUTPUTS
     # ============================================================
     filename_base = f"heating_fuel_grid_{min(years)}_{max(years)}"
+    png_path = os.path.join(output_dir, f'{filename_base}.png')
+    pdf_path = os.path.join(output_dir, f'{filename_base}.pdf')
     
     if verbose:
-        print(f"  Grid complete!")
+        print(f"\n  Saving to: {output_dir}")
     
-    return save_figure(
-        fig=fig,
-        output_dir=output_dir,
-        filename_base=filename_base,
-        dpi=dpi,
-        show_plot=True,  # Grid always shows
-        verbose=verbose
-    )
+    fig.savefig(png_path, dpi=dpi, bbox_inches='tight', facecolor='white')
+    fig.savefig(pdf_path, bbox_inches='tight', facecolor='white')
+    
+    if verbose:
+        print(f"  ✓ Grid complete!")
+    
+    plt.show()
+    plt.close(fig)
+    
+    return png_path, pdf_path
+
