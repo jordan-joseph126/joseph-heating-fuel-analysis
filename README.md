@@ -6,18 +6,18 @@ Mapping Analysis of Primary Residential Heating Fuels Across U.S. Census Tracts
 # Table of Contents
 ## Table of Contents
 1. [Section 1: Installation and Setup](#section-1-installation-and-setup)
-  1. [1.0 Prerequisites and Conda Health Check](#10-prerequisites-and-conda-health-check)
-  2. [1.1 Software Installation](#11-software-installation)
-    - [Git for Windows](#git-for-windows)
-    - [Anaconda Navigator](#anaconda-navigator)
-    - [Visual Studio Code](#visual-studio-code)
-    - [Fix PATH Integration (Critical Step)](#fix-path-integration-critical-step)
+  1. [1.0 Prerequisites and Check Conda](#10-prerequisites-and-check-conda)
+  2. [1.1 Software Installation](#11-software-installation)   
+    - [Git for Windows](#git-for-windows)   
+    - [Anaconda Navigator](#anaconda-navigator)   
+    - [Visual Studio Code](#visual-studio-code)   
+    - [Fix PATH Integration (Critical Step)](#fix-path-integration-critical-step)   
     - [Install VS Code Extensions](#install-vs-code-extensions)
   3. [1.2 Repository Access](#12-repository-access)
   4. [1.3 Repository Structure](#13-repository-structure)
   5. [1.4 Data Download](#14-data-download)
-  6. [1.5 Environment Setup](#15-environment-setup)
-    - [First-Time Setup](#first-time-setup)
+  6. [1.5 Environment Setup](#15-environment-setup)   
+    - [First-Time Setup](#first-time-setup)   
     - [Register Jupyter Kernel](#register-jupyter-kernel)
   7. [1.6 Daily Usage](#16-daily-usage)
   8. [1.7 Troubleshooting](#17-troubleshooting)
@@ -26,9 +26,6 @@ Mapping Analysis of Primary Residential Heating Fuels Across U.S. Census Tracts
 2. [Section 2: Version Information and Attribution](#section-2-version-information-and-attribution)
   1. [2.1 Version Information](#21-version-information)
   2. [2.2 Licensing and Attribution](#22-licensing-and-attribution)
-
-3. [Support and Questions](#support-and-questions)
-4. [Last Updated](#last-updated)
 
 ---
 
@@ -46,15 +43,27 @@ The analysis processes raw NHGIS (National Historical Geographic Information Sys
 **Contact for Support and Questions:** jordanjo@alumni.cmu.edu, jordanjoseph53@gmail.com  
 **For Repository Issues:** GitHub Issues page (for bug reports, feature requests)
 
-NOTE:
-- This codebase was created to replicate calculations that Dr. Jordan Joseph performed in Excel and visualizations made using QGIS software. 
-- Claude AI and GitHub Copilot was used to improve documentation throughout this codebase, including explanatory comments and function documentation (typehints, Google-style docstrings). 
+**IMPORTANT NOTE ON OPERATING SYSTEMS:** 
+
+Setup and troubleshooting steps were created using a Windows PC. There may be slight differences for users on other OS. If this causes issues, consider using Claude, GitHub copilot, or another tool to debug the OS specific issue. If issues persist, please reach out using the contact information above. 
+
+Collaborators are welcomed to contribute the issue (and the resolution steps) on the issues page so that the code base can be updated to ensure accessibility to all users.
+
+**Acknowledgement:** 
+
+This README and the codebase supports the submission of a dataset article to Environmental Research: Energy. The article (current under review) was supported by:
+
+- **Constantine Samaras, PhD:** Writing – review & editing, Conceptualization, Project administration, Methodology
+
+- **Destenie Nock, PhD:** Writing – review & editing
+
+The authors acknowledge funding from Carnegie Mellon University’s Department of Civil and Environmental Engineering and Wilton E. Scott Institute for Energy Innovation. Claude AI and GitHub Copilot were used to improve documentation throughout this codebase, including explanatory comments and function documentation (type hints, Google-style docstrings). 
 
 ---
 
 # Section 1: Installation and Setup
 
-## 1.0 Prerequisites and Conda Health Check
+## 1.0 Prerequisites and Check Conda
 
 **IMPORTANT:** Before proceeding with software installation or environment setup, verify that you have a working Anaconda/Miniconda installation and that conda's package resolver is functioning correctly.
 
@@ -62,7 +71,7 @@ NOTE:
 
 Conda uses a "solver" to figure out which package versions can coexist when creating environments. If the solver has version conflicts (common after Anaconda Navigator updates), environment creation may fail or produce errors. Fixing this BEFORE setup saves significant troubleshooting time.
 
-### Quick Health Check
+### Check Conda
 
 If you already have Anaconda or Miniconda installed, run this test:
 
@@ -71,13 +80,13 @@ If you already have Anaconda or Miniconda installed, run this test:
 conda --version
 ```
 
-** Good Output (Healthy):**
+** Good Output (Working):**
 ```
 conda 25.9.1
 ```
 Just the version number with no errors.
 
-** Problem Output (Needs Fixing):**
+** Problem Output (Needs Fixed):**
 ```
 Error while loading conda entry point: conda-libmamba-solver
 (module 'libmambapy' has no attribute 'QueryFormat')
@@ -87,7 +96,7 @@ If you see error messages before the version number, continue to the fix below.
 
 #### Fixing Conda Solver Errors
 
-If you saw errors in the health check, fix them now:
+If you saw errors in the Conda check, fix them now:
 
 **Step 1: Ensure base environment is active**
 ```bash
@@ -136,7 +145,7 @@ conda config --set solver libmamba
 
 ### If You Don't Have Anaconda Yet
 
-Skip this health check for now and proceed to Section 1.1 to install Anaconda. After installation, return here and run the health check before attempting environment creation.
+Skip the Conda check steps for now and proceed to Section 1.1 to install Anaconda. After installation, return here and then check before attempting environment creation.
 
 ---
 
@@ -196,7 +205,7 @@ conda --version  # Expected: conda 25.X.X (with no errors)
 python --version # Expected: Python 3.12.X or 3.13.X (base environment)
 ```
 
-**IMPORTANT: After installation, go back to [Section 1.0](#10-prerequisites-and-conda-health-check) and run the conda health check before proceeding.**
+**IMPORTANT: After installation, go back to [Section 1.0](#10-prerequisites-and-check-conda) and run the conda check before proceeding.**
 
 ### Visual Studio Code
 **Download:** https://code.visualstudio.com/download
@@ -362,7 +371,7 @@ data/
 
 ## 1.5 Environment Setup
 
-**PREREQUISITE:** Before proceeding, ensure you completed the [conda health check in Section 1.0](#10-prerequisites-and-conda-health-check). If `conda --version` shows errors, fix them first.
+**PREREQUISITE:** Before proceeding, ensure you completed the [conda check steps in Section 1.0](#10-prerequisites-and-check-conda). If `conda --version` shows errors, fix them first.
 
 ### First-Time Setup
 
@@ -387,7 +396,7 @@ conda env create -f environment.yml
 - Takes 5-10 minutes
 - Should complete with **no error messages**
 
-**If you see errors during creation:** Your conda solver may still have issues. Return to [Section 1.0](#10-prerequisites-and-conda-health-check) and verify the fix worked.
+**If you see errors during creation:** Your conda solver may still have issues. Return to [Section 1.0](#10-prerequisites-and-check-conda) and verify the fix worked.
 
 **Step 2: Activate the Environment**
 
@@ -469,14 +478,14 @@ code .
 
 ## 1.7 Troubleshooting
 
-### ISSUE 1: Conda Health Issues (Solver Errors)
+### ISSUE 1: Conda Issues (Solver Errors)
 
 **Symptoms:**
 - `conda env create` fails or shows warnings
 - Messages about "conda entry point" or "libmambapy"
 - Package resolution takes extremely long
 
-**Solution:** See [Section 1.0: Prerequisites and Conda Health Check](#10-prerequisites-and-conda-health-check)
+**Solution:** See [Section 1.0: Prerequisites and Check Conda](#10-prerequisites-and-check-conda)
 
 This issue affects conda itself (base environment), not your project environment. Fix it in the base environment before creating project environments.
 
