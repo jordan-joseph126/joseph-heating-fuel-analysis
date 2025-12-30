@@ -43,7 +43,8 @@ The analysis processes raw NHGIS (National Historical Geographic Information Sys
 
 **Author:** Jordan M. Joseph, PhD   
 **Affiliation:** Carnegie Mellon University  
-**Contact:** jordanjo@alumni.cmu.edu, jordanjoseph53@gmail.com
+**Contact for Support and Questions:** jordanjo@alumni.cmu.edu, jordanjoseph53@gmail.com
+**For Repository Issues:** GitHub Issues page (for bug reports, feature requests)
 
 NOTE:
 - This codebase was created to replicate calculations that Dr. Jordan Joseph performed in Excel and visualizations made using QGIS software. 
@@ -70,13 +71,13 @@ If you already have Anaconda or Miniconda installed, run this test:
 conda --version
 ```
 
-**✅ Good Output (Healthy):**
+** Good Output (Healthy):**
 ```
 conda 25.9.1
 ```
 Just the version number with no errors.
 
-**❌ Problem Output (Needs Fixing):**
+** Problem Output (Needs Fixing):**
 ```
 Error while loading conda entry point: conda-libmamba-solver
 (module 'libmambapy' has no attribute 'QueryFormat')
@@ -84,7 +85,7 @@ conda 24.11.3
 ```
 If you see error messages before the version number, continue to the fix below.
 
-### Fixing Conda Solver Errors
+#### Fixing Conda Solver Errors
 
 If you saw errors in the health check, fix them now:
 
@@ -119,7 +120,7 @@ You can always switch back to the faster libmamba solver later:
 conda config --set solver libmamba
 ```
 
-### Understanding the Issue
+#### Understanding the Issue
 
 **What's happening:** Anaconda Navigator updates can cause version mismatches between:
 - `conda` itself (the package manager)
@@ -127,9 +128,9 @@ conda config --set solver libmamba
 - `libmambapy` (the underlying library)
 
 **Why it matters for this project:** When you run `conda env create -f environment.yml`, conda needs a working solver to figure out which versions of geospatial packages (geopandas, fiona, shapely, pyproj) can work together. A broken solver means:
-- ❌ Environment creation fails
-- ❌ Confusing error messages
-- ❌ Wasted setup time
+-  Environment creation fails
+-  Confusing error messages
+-  Wasted setup time
 
 **How the fix works:** The `conda update` command forces conda to find compatible versions of all three components at once, resolving the mismatch.
 
@@ -180,8 +181,8 @@ git config --global --list
 - Install type: **Just Me (recommended)**
 - Destination: Keep default (`C:\Users\YourName\anaconda3`)
 - Advanced options:
-  - ❌ **DO NOT** check "Add Anaconda3 to my PATH environment variable"
-  - ✅ **CHECK** "Register Anaconda3 as my default Python"
+  -  **DO NOT** check "Add Anaconda3 to my PATH environment variable"
+  -  **CHECK** "Register Anaconda3 as my default Python"
 
 **Why not add to PATH?** Keeps Anaconda isolated, prevents conflicts with other software, and follows Anaconda's recommended best practice.
 
@@ -204,10 +205,10 @@ python --version # Expected: Python 3.12.X or 3.13.X (base environment)
 - Install type: User Installer (recommended)
 - Destination: Keep default
 - Additional tasks:
-  - ✅ Add "Open with Code" action to file context menu
-  - ✅ Add "Open with Code" action to directory context menu
-  - ✅ Register Code as an editor for supported file types
-  - ✅ **Add to PATH (requires shell restart)** ← CRITICAL for `code .` command
+  -  Add "Open with Code" action to file context menu
+  -  Add "Open with Code" action to directory context menu
+  -  Register Code as an editor for supported file types
+  -  **Add to PATH (requires shell restart)** ← CRITICAL for `code .` command
 
 **Verify:**
 ```bash
@@ -289,14 +290,15 @@ joseph-heating-fuel-analysis/
 │   │       ├── nhgis0011_ds249_20205_tract.csv  # 2016-2020 data
 │   │       └── nhgis0011_ds267_20235_tract.csv  # 2019-2023 data
 │   ├── boundaries/                            # Shapefiles
-│   │   ├── tl_2015_2020_2023_5YR_Tract/       # Census tract boundaries
-│   │   └── nhgis0008_shapefile_tl2015_us_state_2015/  # State boundaries
-│   └── tables/                                # Processed data tables (created on run)
+│   │   └── nhgis0011_shape/
+│   │       ├── nhgis0011_shapefile_tl2015_us_state_2015/
+│   │       ├── nhgis0011_shapefile_tl2015_us_tract_2015/
+│   │       ├── nhgis0011_shapefile_tl2020_us_tract_2020/
+│   │       └── nhgis0011_shapefile_tl2023_us_tract_2023/
+│   └── __init__.py
 ├── outputs/                                   # Generated outputs (created on run)
-│   ├── maps/                                  # Generated maps
-│   └── print_layouts/                         # Print-ready outputs
+│   └── maps/                                  # Generated maps
 ├── visualize_us_primary_heating_fuels.ipynb   # MAIN ENTRY POINT
-├── energy_consumption_chart.ipynb             # Additional analysis notebook
 ├── environment.yml                            # Conda environment specification
 ├── requirements.txt                           # Pip requirements
 ├── setup.py                                   # Package installation script
@@ -314,49 +316,30 @@ joseph-heating-fuel-analysis/
 
 ## 1.4 Data Download
 
-The analysis requires census tract heating fuel data and geographic boundaries from NHGIS:
+The raw data used in this study are publicly available from NHGIS under their data use agreement. Registration is required but is free for research and educational purposes. 
 
-### Data Source
-**NHGIS (National Historical Geographic Information System)**
-URL: https://www.nhgis.org
+The data used in the data analysis workflow is publicly available on Zenodo under the GNU GPLv3 license. The data directory, organized in the appropriate file path structure, is available here: https://doi.org/10.5281/zenodo.17706631
 
-### Required Datasets
+The Zenodo data folder contains the data required to run the joseph-heating-fuel-analysis GitHub repo code (not included in the Github repository). 
+[1]	Download the data from this page
+[2]	Extract all files from the zipped folder
+[3]	Copy and paste the folder contents in the empty folder at the following path: [YOUR_PATH]/joseph-heating-fuel-analysis
 
-**1. Housing Unit Heating Fuel Data**
-- Dataset: American Community Survey (ACS) 5-Year Estimates
-- Table: **B25040** (House Heating Fuel)
-- Years needed:
-  - 2011-2015 (Dataset: ds215)
-  - 2016-2020 (Dataset: ds249)
-  - 2019-2023 (Dataset: ds267)
-- Geographic level: Census Tract
-- Format: CSV
+**OPTIONAL:** 
+If you choose to download the files (e.g., for a different 5-year dataset), be sure to read the note in the config.py file about updating the file paths. The data acquisition process is outlined below:
 
-**2. Census Tract Boundaries**
-- Source: TIGER/Line Shapefiles
-- Years: 2015, 2020, 2023
-- Geographic level: Census Tract
-- Format: Shapefile
+[1]	Register for a free account at NHGIS (https://www.nhgis.org).
+[2]	Use the Data Finder to select:
+-	Geographic level: Census Tract, State
+-	Years: 2015 (2011-2015), 2020 (2016-2020), 2023 (2019-2023)
+-	Topic: Heating, Cooling, and Fuels
+[3]	In the “SOURCE TABLES” tab under “SELECT DATA”:
+-	Find the rows with Table: B25040 (House Heating Fuel) under Table Name and the listed “Year – Dataset” options of interest.
+-	Click the green plus sign to the left of those rows.
+[4]	Then click the “GIS FILES” tab under “SELECT DATA” to add the 2015, 2020, and 2023 Census Tract shapefiles (TIGER/Line + under “BASIS”). Also, select one of the State options (we chose 2015).
+[5]	Click the “CONTINUE” button in the top right corner. Review the selections and click “CONTINUE” again. 
+[6]	Check the descriptive header row box and hit submit.
 
-**3. State Boundaries** (optional, for map context)
-- Source: TIGER/Line Shapefiles
-- Year: 2015
-- Geographic level: State
-- Format: Shapefile
-
-### Download Instructions
-
-1. Visit https://www.nhgis.org
-2. Create a free account or log in
-3. Use the Data Finder to:
-   - Select geographic level: Census Tract
-   - Select years: 2015, 2020, 2023
-   - Select table: B25040 (House Heating Fuel)
-   - Add to cart
-4. Also add corresponding shapefiles for each year
-5. Submit your data extract
-6. Download when ready (usually within minutes)
-7. Extract all files into `joseph-heating-fuel-analysis/data/`
 
 **Expected directory structure after extraction:**
 ```
@@ -367,12 +350,12 @@ data/
 │       ├── nhgis0011_ds249_20205_tract.csv
 │       └── nhgis0011_ds267_20235_tract.csv
 ├── boundaries/
-│   ├── tl_2015_2020_2023_5YR_Tract/
-│   │   ├── nhgis0011_shapefile_tl2015_us_tract_2015/
-│   │   ├── nhgis0011_shapefile_tl2020_us_tract_2020/
-│   │   └── nhgis0011_shapefile_tl2023_us_tract_2023/
-│   └── nhgis0008_shapefile_tl2015_us_state_2015/
-└── tables/
+│   └── nhgis0011_shape/
+│       ├── nhgis0011_shapefile_tl2015_us_state_2015/
+│       ├── nhgis0011_shapefile_tl2015_us_tract_2015/
+│       ├── nhgis0011_shapefile_tl2020_us_tract_2020/
+│       └── nhgis0011_shapefile_tl2023_us_tract_2023/
+└── __init__.py
 ```
 
 **Note:** The exact file paths in `config.py` may need adjustment based on your NHGIS extract filenames.
@@ -422,8 +405,6 @@ pip install -e .
 
 **What this does:** Installs your project as a Python package so you can import modules like `config` and functions from `scripts` from any notebook.
 
-**Why `-e` (editable mode)?** Changes to your code are immediately available without reinstalling. Critical for development and experimentation.
-
 ### Register Jupyter Kernel
 
 ```bash
@@ -468,7 +449,6 @@ cd /path/to/joseph-heating-fuel-analysis
 code .
 ```
 
-**Why from Anaconda Prompt?** VS Code inherits conda environment variables, ensuring correct environment detection.
 
 ### Running Notebooks
 
@@ -679,31 +659,14 @@ pip install -e .
 python -m ipykernel install --user --name=joseph-heating-fuel-env --display-name "Python (Heating Fuel Analysis)"
 ```
 
-### Exporting Your Environment
-
-To share your exact environment with collaborators:
-
-**Cross-platform (recommended):**
-```bash
-conda env export --no-builds > environment-shared.yml
-```
-
-**Platform-specific (exact reproduction):**
-```bash
-conda env export > environment-exact.yml
-```
-
 ---
 
 # Section 2: Version Information and Attribution
 
 ## 2.1 Version Information
 
-**Current Version:** 1.0.0
-
-**Development Status:** Production/Stable
-
-**Update Frequency:** As needed for data updates or methodology improvements
+**Version History:**
+- **v1.0.0** (Current): Initial public release with comprehensive documentation
 
 **Checking for Updates:**
 ```bash
@@ -712,12 +675,9 @@ git pull origin main
 python setup.py --version
 ```
 
-**Version History:**
-- **v1.0.0** (Current): Initial public release with comprehensive documentation
-
 ## 2.2 Licensing and Attribution
 
-**License:** To be determined (consider MIT License for open source research)
+**License:** GNU GPLv3 license
 
 **Author:** Jordan M. Joseph, PhD
 **Affiliation:** Carnegie Mellon University
@@ -730,12 +690,22 @@ Fuels Across U.S. Census Tracts. Carnegie Mellon University.
 https://github.com/jordan-joseph126/joseph-heating-fuel-analysis
 ```
 
+**Data Availability**
+The raw data used in this study are publicly available from NHGIS under their data use agreement. Registration is required but is free for research and educational purposes. 
+
+The data used in the data analysis workflow is publicly available on Zenodo under the GNU GPLv3 license. Zenodo repository: https://doi.org/10.5281/zenodo.17706631
+
+**Code Availability**
+The analysis code and visualization tools are publicly available in the GitHub repository under the GNU GPLv3 license. 
+
+GitHub repository: https://github.com/jordan-joseph126/joseph-heating-fuel-analysis.git
+
+
 **Intended Usage:**
 - Research and academic use
 - Modification and extension for research purposes
 - Integration into other research projects
 - Educational and teaching applications
-- Commercial use permissions to be specified in final license
 
 **Attribution Requirements:**
 - Cite this analysis in publications using the data or maps
@@ -747,7 +717,6 @@ https://github.com/jordan-joseph126/joseph-heating-fuel-analysis
 
 This analysis uses publicly available data from IPUMS NHGIS:
 
-**Primary Data Source:**
 ```
 Jonathan Schroeder, David Van Riper, Steven Manson, Katherine Knowles,
 Tracy Kugler, Finn Roberts, and Steven Ruggles. IPUMS National Historical
@@ -755,45 +724,18 @@ Geographic Information System: Version 20.0 [dataset]. Minneapolis, MN:
 IPUMS. 2025. http://doi.org/10.18128/D050.V20.0
 ```
 
-**Required Citation for NHGIS Data:**
-Publications and research reports based on the NHGIS database must cite it appropriately. The citation should include:
-- The NHGIS project and the Regents of the University of Minnesota
-- The URL https://www.nhgis.org
-- The version number (check www.nhgis.org for current version)
+**Primary Data Sources:**
+```
+[1]	 U.S. Census Bureau 2025 TIGER/Line Shapefiles (State and Census Tract Boundaries)
+[2]	 U.S. Census Bureau 2016 Table B25040 (House Heating Fuel), American Community Survey 5-Year Estimates (2011-2015)
+[3]	 U.S. Census Bureau 2021 Table B25040 (House Heating Fuel), American Community Survey 5-Year Estimates (2016-2020)
+[4]	 U.S. Census Bureau 2024 Table B25040 (House Heating Fuel), American Community Survey 5-Year Estimates (2019-2023)
+```
 
 **Tools and Software:**
 - Python geospatial stack (GeoPandas, Shapely, Fiona, PyProj)
 - Matplotlib for visualization
 - Jupyter for interactive analysis
-- VS Code and GitHub Copilot assisted with code documentation
+- Claude AI and GitHub Copilot assisted with code documentation
 
 ---
-
-## Support and Questions
-
-- **Primary Contact:** jordanjo@alumni.cmu.edu, jordanjoseph53@gmail.com
-- **Repository Issues:** GitHub Issues page (for bug reports, feature requests)
-- **Documentation:** This README and inline code documentation (Google-style docstrings, type hints, comments)
-
-**Common Support Topics:**
-- Environment setup troubleshooting
-- Data download and integration from NHGIS
-- Customizing maps (colors, boundaries, insets)
-- Adapting code for different census tables or geographies
-- Extension to other time periods or geographic levels
-- Collaboration opportunities
-
-**Response Time:** Typically within 2-3 business days for email inquiries
-
----
-
-## Support and Questions
-
-For questions, bug reports, or collaboration inquiries, please contact:
-- **Email:** jordanjo@alumni.cmu.edu, jordanjoseph53@gmail.com
-- **GitHub Issues:** https://github.com/jordan-joseph126/joseph-heating-fuel-analysis/issues
-
----
-
-**Last Updated:** 2025-11-25
-**Status:** ✅ Production-ready with comprehensive documentation

@@ -10,6 +10,7 @@ archive/
 
 # Output folders
 outputs/
+outputs/print_layouts/
 
 # Large  data files
 data/
