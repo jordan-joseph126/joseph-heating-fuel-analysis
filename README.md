@@ -43,21 +43,30 @@ The analysis processes raw NHGIS (National Historical Geographic Information Sys
 **Contact for Support and Questions:** jordanjo@alumni.cmu.edu, jordanjoseph53@gmail.com  
 **For Repository Issues:** GitHub Issues page (for bug reports, feature requests)
 
-**IMPORTANT NOTE ON OPERATING SYSTEMS:** 
-
-Setup and troubleshooting steps were created using a Windows PC. There may be slight differences for users on other OS. If this causes issues, consider using Claude, GitHub copilot, or another tool to debug the OS specific issue. If issues persist, please reach out using the contact information above. 
-
-Collaborators are welcomed to contribute the issue (and the resolution steps) on the issues page so that the code base can be updated to ensure accessibility to all users.
-
 **Acknowledgement:** 
 
-This README and the codebase supports the submission of a dataset article to Environmental Research: Energy. The article (current under review) was supported by:
+This README and the codebase supports the Dataset Article submitted to Environmental Research Energy (ERE): "Determining U.S. residential primary heating fuels for energy analysis and planning"
+
+Co-authors on this article are:
 
 - **Constantine Samaras, PhD:** Writing – review & editing, Conceptualization, Project administration, Methodology
 
 - **Destenie Nock, PhD:** Writing – review & editing
 
 The authors acknowledge funding from Carnegie Mellon University’s Department of Civil and Environmental Engineering and Wilton E. Scott Institute for Energy Innovation. Claude AI and GitHub Copilot were used to improve documentation throughout this codebase, including explanatory comments and function documentation (type hints, Google-style docstrings). 
+
+**Data Availability**
+The raw data used in this study are publicly available from NHGIS under their data use agreement. Registration is required but is free for research and educational purposes. 
+
+The data used in the data analysis workflow is publicly available on Zenodo under the GNU GPLv3 license. Zenodo repository: https://doi.org/10.5281/zenodo.17706631
+
+**Code Availability**
+The analysis code and visualization tools are publicly available in the GitHub repository under the GNU GPLv3 license. GitHub repository: https://github.com/jordan-joseph126/joseph-heating-fuel-analysis.git
+
+
+**An important note about setting up and running the codebase on different OS:**
+- Setup and troubleshooting steps were created using a Windows PC. There may be slight differences for users on other OS. If this causes issues, consider using Claude, GitHub copilot, or another tool to debug the OS specific issue. If issues persist, please reach out using this contact information: jordanjo@alumni.cmu.edu, jordanjoseph53@gmail.com  
+- Collaborators are welcomed to contribute the issue (and the resolution steps) on the issues page so that the code base can be updated to ensure accessibility to all users.
 
 ---
 
