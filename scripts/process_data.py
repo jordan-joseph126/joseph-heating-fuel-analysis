@@ -17,7 +17,8 @@ import geopandas as gpd
 
 def process_heating_fuel_data(
     df: pd.DataFrame,
-    year: int
+    year: int,
+    include_moe: bool = True
 ) -> pd.DataFrame:
     """Process raw NHGIS heating fuel data for a specific year.
     
@@ -29,18 +30,22 @@ def process_heating_fuel_data(
     5. Calculates fuel type percentages
     6. Identifies dominant fuel type and handles ties
     7. Calculates dominant fuel statistics
+    8. Optionally extracts margin of error (MOE) columns
     
     Args:
         df: DataFrame containing raw NHGIS data.
         year: Year identifier (2015, 2020, or 2023).
+        include_moe: If True, extract and rename MOE columns alongside estimate
+            columns. MOE columns are named MOE_{readable_name} (e.g.,
+            MOE_Natural_Gas). Defaults to True.
     
     Returns:
-        Processed DataFrame with 35 columns including geographic identifiers,
-        fuel counts, percentages, and dominant fuel analysis.
+        Processed DataFrame with geographic identifiers, fuel counts,
+        percentages, dominant fuel analysis, and (if include_moe=True)
+        MOE columns for each fuel type.
         
     Raises:
         KeyError: If year is not 2015, 2020, or 2023.
-        FileNotFoundError: If raw_csv_path does not exist.
     """
     
     # Year-specific column mappings
@@ -96,7 +101,20 @@ def process_heating_fuel_data(
         f'{fuel_prefix}010': 'No_Fuel'
     }
     
-    df = df[list(columns_to_keep.keys())].rename(columns=columns_to_keep)
+    if include_moe:
+        moe_prefix = fuel_prefix[:-1] + 'M'  # Replace trailing E with M
+        # Derive MOE mapping programmatically from estimate mapping so they stay in sync
+        fuel_estimate_cols = {k: v for k, v in columns_to_keep.items()
+                              if k.startswith(fuel_prefix)}
+        moe_columns_to_keep = {
+            k.replace(fuel_prefix, moe_prefix): f'MOE_{v}'
+            for k, v in fuel_estimate_cols.items()
+        }
+        all_columns = {**columns_to_keep, **moe_columns_to_keep}
+    else:
+        all_columns = columns_to_keep
+
+    df = df[list(all_columns.keys())].rename(columns=all_columns)
     
     # Extract FIPS_Code (last 11 characters of GEOID)
     df['FIPS_Code'] = df['GEOID'].str[-11:]
@@ -184,6 +202,176 @@ def _identify_dominant_fuel(
             return fuel
     
     return 'Error'  # Should never reach here
+
+
+# ============================================================================
+# FUNCTIONS: Margin of Error and Reliability Analysis
+# ============================================================================
+
+def calculate_cv(estimate: pd.Series, moe: pd.Series) -> pd.Series:
+    """Calculate the coefficient of variation from ACS estimates and margins of error.
+
+    The CV measures relative reliability of an ACS estimate. It is calculated as:
+        CV = (MOE / 1.645) / Estimate
+    where 1.645 converts the 90% confidence MOE to a standard error.
+
+    Following U.S. Census Bureau guidance, estimates with CV > 0.30 are considered
+    potentially unreliable.
+
+    Args:
+        estimate: ACS point estimate values (counts of housing units).
+        moe: ACS margin of error values at the 90% confidence level.
+
+    Returns:
+        Series of CV values. Returns NaN where estimate is 0 or where
+        either input is NaN.
+
+    References:
+        U.S. Census Bureau. (2022). "Increased Margins of Error in the 5-Year
+        Estimates Containing Data Collected in 2020." Census.gov.
+        https://www.census.gov/programs-surveys/acs/technical-documentation/user-notes/2022-04.html
+    """
+    se = moe / 1.645
+    # CV is undefined when estimate is zero; NaN propagates for missing inputs
+    valid = (estimate > 0) & estimate.notna() & moe.notna()
+    cv = np.where(valid, se / estimate, np.nan)
+    return pd.Series(cv, index=estimate.index, dtype=float)
+
+
+def flag_unreliable_tracts(
+    df: pd.DataFrame,
+    cv_threshold: float = 0.30,
+    flag_total: bool = True,
+    flag_dominant: bool = True
+) -> pd.DataFrame:
+    """Flag census tracts with potentially unreliable ACS estimates based on CV.
+
+    Calculates the coefficient of variation (CV) for Total Housing Units and
+    for the dominant fuel count in each tract. Adds flag columns indicating
+    whether each tract exceeds the specified CV threshold.
+
+    Args:
+        df: DataFrame with processed heating fuel data. Must contain estimate
+            columns and their corresponding MOE columns (MOE_ prefix).
+        cv_threshold: CV value above which estimates are flagged as unreliable.
+            Default is 0.30, following Census Bureau guidance. Users may adjust
+            this for their specific applications.
+        flag_total: If True, calculate CV on Total_Housing_Units.
+        flag_dominant: If True, calculate CV on the dominant fuel count.
+
+    Returns:
+        DataFrame with additional columns:
+            - CV_Total_Housing_Units: CV for total housing unit count
+            - CV_Dom_Fuel: CV for the dominant fuel count
+            - Flag_Unreliable_Total: True if CV_Total > threshold
+            - Flag_Unreliable_Dom_Fuel: True if CV_Dom_Fuel > threshold
+
+    Raises:
+        ValueError: If MOE columns are not present in the DataFrame.
+    """
+    # Mapping from Dom_Fuel_Type values to their corresponding MOE columns
+    FUEL_TO_MOE: Dict[str, str] = {
+        'Natural_Gas': 'MOE_Natural_Gas',
+        'Propane': 'MOE_Propane',
+        'Electricity': 'MOE_Electricity',
+        'Fuel_Oil': 'MOE_Fuel_Oil',
+        'Coal': 'MOE_Coal',
+        'Wood': 'MOE_Wood',
+        'Solar': 'MOE_Solar',
+        'Other': 'MOE_Other',
+        'No_Fuel': 'MOE_No_Fuel',
+    }
+
+    result = df.copy()
+
+    if flag_total:
+        if 'MOE_Total_Housing_Units' not in result.columns:
+            raise ValueError(
+                "MOE_Total_Housing_Units column not found. "
+                "Run process_heating_fuel_data(df, year, include_moe=True) first."
+            )
+        result['CV_Total_Housing_Units'] = calculate_cv(
+            result['Total_Housing_Units'], result['MOE_Total_Housing_Units']
+        )
+        result['Flag_Unreliable_Total'] = result['CV_Total_Housing_Units'] > cv_threshold
+
+    if flag_dominant:
+        missing_moe = [col for col in FUEL_TO_MOE.values() if col not in result.columns]
+        if missing_moe:
+            raise ValueError(
+                f"MOE columns not found: {missing_moe}. "
+                "Run process_heating_fuel_data(df, year, include_moe=True) first."
+            )
+        # Vectorized lookup: select the MOE column matching each tract's dominant fuel
+        conditions = [result['Dom_Fuel_Type'] == fuel for fuel in FUEL_TO_MOE]
+        choices = [result[moe_col] for moe_col in FUEL_TO_MOE.values()]
+        dom_fuel_moe = pd.Series(
+            np.select(conditions, choices, default=np.nan),
+            index=result.index,
+            dtype=float
+        )
+        result['CV_Dom_Fuel'] = calculate_cv(result['Dom_Fuel_Count'], dom_fuel_moe)
+        result['Flag_Unreliable_Dom_Fuel'] = result['CV_Dom_Fuel'] > cv_threshold
+
+    return result
+
+
+def print_cv_summary(
+    df: pd.DataFrame,
+    thresholds: List[float] = [0.15, 0.20, 0.30, 0.40]
+) -> pd.DataFrame:
+    """Print and return a summary of tract reliability at various CV thresholds.
+
+    Shows how many tracts would be flagged as unreliable at each threshold,
+    for both Total Housing Units and Dominant Fuel CV.
+
+    Args:
+        df: DataFrame that has been processed by flag_unreliable_tracts().
+            Must contain CV_Total_Housing_Units and CV_Dom_Fuel columns.
+        thresholds: List of CV thresholds to evaluate.
+
+    Returns:
+        DataFrame summarizing flagged tract counts and percentages at each threshold.
+    """
+    required_cols = ['CV_Total_Housing_Units', 'CV_Dom_Fuel']
+    missing = [c for c in required_cols if c not in df.columns]
+    if missing:
+        raise ValueError(
+            f"Required columns not found: {missing}. "
+            "Run flag_unreliable_tracts() first."
+        )
+
+    total_tracts = len(df)
+
+    rows = []
+    for threshold in thresholds:
+        total_flagged = int((df['CV_Total_Housing_Units'] > threshold).sum())
+        dom_flagged = int((df['CV_Dom_Fuel'] > threshold).sum())
+        rows.append({
+            'Threshold': f'CV > {threshold:.2f}',
+            'Total_Flagged': total_flagged,
+            'Total_Pct': total_flagged / total_tracts * 100,
+            'Dom_Flagged': dom_flagged,
+            'Dom_Pct': dom_flagged / total_tracts * 100,
+        })
+
+    summary_df = pd.DataFrame(rows)
+
+    print("\nCV Reliability Summary")
+    print("=" * 54)
+    print(f"{'':12} {'Total Housing Units':>22}    {'Dominant Fuel':>13}")
+    print(f"{'Threshold':<12} {'Flagged':>8}    {'(%)':>6}  {'Flagged':>10}    {'(%)':>6}")
+    print("-" * 54)
+    for _, row in summary_df.iterrows():
+        print(
+            f"{row['Threshold']:<12} {int(row['Total_Flagged']):>8,}   {row['Total_Pct']:>5.1f}%"
+            f"  {int(row['Dom_Flagged']):>10,}   {row['Dom_Pct']:>5.1f}%"
+        )
+    print("=" * 54)
+    print(f"Total tracts: {total_tracts:,}")
+
+    return summary_df
+
 
 # ============================================================================
 # FUNCTIONS: Prepare Geodataframe for Mapping
