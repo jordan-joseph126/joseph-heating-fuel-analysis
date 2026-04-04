@@ -19,6 +19,9 @@ dependencies:
   - pyproj>=3.0.0
   - rtree>=1.0.0
   
+  # Excel file reading
+  - openpyxl>=3.0.0
+
   # Visualization
   - matplotlib>=3.4.0
   - contextily>=1.1.0
