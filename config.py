@@ -48,3 +48,39 @@ TRACT_SHAPEFILE_2023 = os.path.join(BOUNDARIES_DIR, 'nhgis0011_shapefile_tl2023_
 
 # State boundaries (optional - for map context)
 STATE_SHAPEFILE_2015 = os.path.join(BOUNDARIES_DIR, 'nhgis0011_shapefile_tl2015_us_state_2015', 'US_state_2015.shp')
+
+# ============================================================================
+# COUNTY-LEVEL DATA (Census Bureau direct downloads, not NHGIS)
+# ============================================================================
+"""
+The county-level analysis sources data directly from the Census Bureau instead
+of NHGIS:
+  - Attribute data: Table B25040 (House Heating Fuel) 5-year ACS estimates,
+    downloaded per-county from data.census.gov. Unlike the NHGIS tract
+    extracts, the B25040_0XXE/B25040_0XXM variable codes are the same across
+    every ACS vintage, so a single county processing function handles all
+    years (see process_heating_fuel_data_county() in scripts/process_data.py).
+  - Boundaries: Census cartographic boundary (cb) shapefiles, not TIGER/Line
+    (tl) files -- cb files clip out large water areas that make tl-based
+    county maps render with distracting slivers along coastlines/rivers.
+"""
+
+RAW_DATA_DIR_COUNTY = os.path.join(PROJECT_ROOT, 'data', 'raw_data_and_codebook', 'census_b25040_county')
+BOUNDARIES_DIR_COUNTY = os.path.join(PROJECT_ROOT, 'data', 'boundaries', 'census_cb_shapefiles')
+
+RAW_CSV_COUNTY_2015 = os.path.join(RAW_DATA_DIR_COUNTY, 'ACSDT5Y2015.B25040-Data.csv')
+RAW_CSV_COUNTY_2020 = os.path.join(RAW_DATA_DIR_COUNTY, 'ACSDT5Y2020.B25040-Data.csv')
+RAW_CSV_COUNTY_2023 = os.path.join(RAW_DATA_DIR_COUNTY, 'ACSDT5Y2023.B25040-Data.csv')
+RAW_CSV_COUNTY_2024 = os.path.join(RAW_DATA_DIR_COUNTY, 'ACSDT5Y2024.B25040-Data.csv')
+
+COUNTY_SHAPEFILE_2015 = os.path.join(BOUNDARIES_DIR_COUNTY, 'cb_2015_us_county_500k', 'cb_2015_us_county_500k.shp')
+COUNTY_SHAPEFILE_2020 = os.path.join(BOUNDARIES_DIR_COUNTY, 'cb_2020_us_county_500k', 'cb_2020_us_county_500k.shp')
+COUNTY_SHAPEFILE_2023 = os.path.join(BOUNDARIES_DIR_COUNTY, 'cb_2023_us_county_500k', 'cb_2023_us_county_500k.shp')
+COUNTY_SHAPEFILE_2024 = os.path.join(BOUNDARIES_DIR_COUNTY, 'cb_2024_us_county_500k', 'cb_2024_us_county_500k.shp')
+
+# State cb boundaries -- matching vintage per year, since (unlike the county
+# files) they're small and there's no reason not to keep them in sync.
+STATE_CB_SHAPEFILE_2015 = os.path.join(BOUNDARIES_DIR_COUNTY, 'cb_2015_us_state_500k', 'cb_2015_us_state_500k.shp')
+STATE_CB_SHAPEFILE_2020 = os.path.join(BOUNDARIES_DIR_COUNTY, 'cb_2020_us_state_500k', 'cb_2020_us_state_500k.shp')
+STATE_CB_SHAPEFILE_2023 = os.path.join(BOUNDARIES_DIR_COUNTY, 'cb_2023_us_state_500k', 'cb_2023_us_state_500k.shp')
+STATE_CB_SHAPEFILE_2024 = os.path.join(BOUNDARIES_DIR_COUNTY, 'cb_2024_us_state_500k', 'cb_2024_us_state_500k.shp')

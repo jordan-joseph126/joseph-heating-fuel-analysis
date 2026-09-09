@@ -12,6 +12,19 @@ from typing import Dict, List, Optional, Tuple
 import geopandas as gpd
 
 # ============================================================================
+# SHARED CONSTANTS
+# ============================================================================
+
+# Fuel columns in Census Table B25040 order. Both the NHGIS tract extracts
+# (ADQYE/AMVDE/ASUPE prefixes) and the Census county extract (B25040_0XXE)
+# are this same underlying ACS table, so the same fuel order applies to both.
+FUEL_COLUMNS: List[str] = [
+    'Natural_Gas', 'Propane', 'Electricity', 'Fuel_Oil',
+    'Coal', 'Wood', 'Solar', 'Other', 'No_Fuel'
+]
+
+
+# ============================================================================
 # FUNCTIONS: Process NHGIS Heating Fuel Data for a Given Year
 # ============================================================================
 
@@ -118,18 +131,129 @@ def process_heating_fuel_data(
     
     # Extract FIPS_Code (last 11 characters of GEOID)
     df['FIPS_Code'] = df['GEOID'].str[-11:]
-    
+
+    return _compute_fuel_metrics(df)
+
+
+def process_heating_fuel_data_county(
+    df: pd.DataFrame,
+    year: int,
+    include_moe: bool = True
+) -> pd.DataFrame:
+    """Process raw Census Bureau county-level heating fuel data (Table B25040).
+
+    Counterpart to process_heating_fuel_data() for the county-level analysis,
+    which sources data directly from data.census.gov instead of NHGIS (see
+    the note in config.py). Unlike the NHGIS tract extracts, Census's own
+    table downloads use the same B25040_0XXE/B25040_0XXM variable codes for
+    every ACS 5-year vintage, so no year-specific column mapping is needed --
+    `year` is only recorded in the output YEAR column for parity with the
+    tract-level function.
+
+    Performs the same transformations as process_heating_fuel_data():
+    1. Selects and renames B25040 columns to the same standardized names
+    2. Extracts a 5-digit state+county FIPS code from GEO_ID (matches the
+       GEOID field on Census cartographic boundary (cb) county shapefiles)
+    3. Flags data quality, calculates fuel percentages, identifies the
+       dominant fuel type, and (optionally) extracts MOE columns
+
+    Args:
+        df: DataFrame loaded from a data.census.gov B25040 county CSV
+            (e.g. ACSDT5Y2023.B25040-Data.csv), read with skiprows=[1] to
+            drop the descriptive label row.
+        year: Year identifier for the ACS 5-year vintage (e.g. 2015, 2020,
+            2023). Recorded in the output YEAR column; does not affect
+            column selection since Census's own codes don't vary by year.
+        include_moe: If True, extract and rename MOE columns alongside
+            estimate columns, named MOE_{readable_name}. Defaults to True.
+
+    Returns:
+        Processed DataFrame with geographic identifiers, fuel counts,
+        percentages, dominant fuel analysis, and (if include_moe=True)
+        MOE columns for each fuel type -- same schema as
+        process_heating_fuel_data(), aside from FIPS_Code length (5 digits
+        for county vs. 11 for tract) and the absence of tract-only metadata
+        columns (STUSAB, STATEA, COUNTYA, TRACTA) that Census's table
+        download doesn't include.
+    """
+    # B25040 variable order: 001=Total, 002=Utility gas, 003=Bottled/tank/LP
+    # gas, 004=Electricity, 005=Fuel oil/kerosene, 006=Coal or coke, 007=Wood,
+    # 008=Solar energy, 009=Other fuel, 010=No fuel used -- same order as the
+    # NHGIS ADQYE/AMVDE/ASUPE prefixes, since it's the same underlying table.
+    columns_to_keep = {
+        'GEO_ID': 'GEO_ID',
+        'NAME': 'County_Name',
+        'B25040_001E': 'Total_Housing_Units',
+        'B25040_002E': 'Natural_Gas',
+        'B25040_003E': 'Propane',
+        'B25040_004E': 'Electricity',
+        'B25040_005E': 'Fuel_Oil',
+        'B25040_006E': 'Coal',
+        'B25040_007E': 'Wood',
+        'B25040_008E': 'Solar',
+        'B25040_009E': 'Other',
+        'B25040_010E': 'No_Fuel',
+    }
+
+    if include_moe:
+        fuel_estimate_cols = {k: v for k, v in columns_to_keep.items()
+                              if k.startswith('B25040_')}
+        moe_columns_to_keep = {
+            k[:-1] + 'M': f'MOE_{v}'
+            for k, v in fuel_estimate_cols.items()
+        }
+        all_columns = {**columns_to_keep, **moe_columns_to_keep}
+    else:
+        all_columns = columns_to_keep
+
+    df = df[list(all_columns.keys())].rename(columns=all_columns).copy()
+
+    # Coerce estimate/MOE columns to numeric -- Census table downloads store
+    # them as strings and can contain annotation flags (e.g. "-", "N") for
+    # suppressed cells, which become NaN (handled as Insufficient_Data).
+    numeric_cols = [v for k, v in all_columns.items() if k != 'GEO_ID' and k != 'NAME']
+    for col in numeric_cols:
+        df[col] = pd.to_numeric(df[col], errors='coerce')
+
+    df['YEAR'] = year
+
+    # GEOID: 5-digit state+county FIPS (last 5 chars of GEO_ID, e.g.
+    # "0500000US01001" -> "01001"), matching the GEOID field on Census cb
+    # county shapefiles for merging in prepare_geodataframe().
+    df['GEOID'] = df['GEO_ID'].str[-5:]
+    df['FIPS_Code'] = df['GEOID']
+
+    return _compute_fuel_metrics(df)
+
+
+def _compute_fuel_metrics(
+    df: pd.DataFrame,
+    fuel_columns: List[str] = FUEL_COLUMNS
+) -> pd.DataFrame:
+    """Shared data-quality, percentage, and dominant-fuel logic.
+
+    Expects df to already have a standardized 'Total_Housing_Units' column
+    and each column in fuel_columns present. Used by both
+    process_heating_fuel_data() (tract-level NHGIS) and
+    process_heating_fuel_data_county() (county-level Census) so the
+    downstream analysis logic stays identical regardless of geography.
+
+    Args:
+        df: DataFrame with standardized fuel count columns already selected.
+        fuel_columns: Ordered list of fuel column names to analyze.
+
+    Returns:
+        df with Data_Quality_Check, Pct_{fuel} columns, Has_Dom_Tie,
+        Dom_Fuel_Type, Dom_Fuel_Count, and Dom_Fuel_Pct added.
+    """
     # Create data quality flag
     df['Data_Quality_Check'] = np.where(
         (df['Total_Housing_Units'].notna()) & (df['Total_Housing_Units'] > 0),
         'Valid_Data',
         'Insufficient_Data'
     )
-    
+
     # Calculate percentages for all fuel types
-    fuel_columns = ['Natural_Gas', 'Propane', 'Electricity', 'Fuel_Oil', 
-                    'Coal', 'Wood', 'Solar', 'Other', 'No_Fuel']
-    
     for fuel in fuel_columns:
         pct_col = f'Pct_{fuel}'
         df[pct_col] = np.where(
@@ -137,40 +261,40 @@ def process_heating_fuel_data(
             np.nan,
             np.round((df[fuel] / df['Total_Housing_Units']) * 100, 1)
         )
-    
+
     # Find max fuel value and detect ties
     fuel_counts = df[fuel_columns]
     df['_max_fuel_value'] = fuel_counts.max(axis=1)
     df['_tie_count'] = (fuel_counts == df['_max_fuel_value'].values[:, np.newaxis]).sum(axis=1)
-    
+
     df['Has_Dom_Tie'] = np.where(
         df['Total_Housing_Units'] == 0,
         False,
         df['_tie_count'] > 1
     )
-    
+
     # Identify dominant fuel type
     df['Dom_Fuel_Type'] = df.apply(
-        lambda row: _identify_dominant_fuel(row, fuel_columns), 
+        lambda row: _identify_dominant_fuel(row, fuel_columns),
         axis=1
     )
-    
+
     # Calculate dominant fuel statistics
     df['Dom_Fuel_Count'] = np.where(
         (df['Data_Quality_Check'] == 'Insufficient_Data') | (df['Has_Dom_Tie']),
         np.nan,
         df['_max_fuel_value']
     )
-    
+
     df['Dom_Fuel_Pct'] = np.where(
         (df['Data_Quality_Check'] == 'Insufficient_Data') | (df['Has_Dom_Tie']),
         np.nan,
         np.round((df['_max_fuel_value'] / df['Total_Housing_Units']) * 100, 1)
     )
-    
+
     # Remove temporary calculation columns
     df = df.drop(columns=['_max_fuel_value', '_tie_count'])
-    
+
     return df
 
 
@@ -412,23 +536,88 @@ def simplify_fuel_categories(fuel_type: str) -> str:
     else:  # No_Fuel, No_Data
         return 'No_Fuel_Missing'
 
+def _detect_state_column(gdf: gpd.GeoDataFrame) -> str:
+    """Find the state-abbreviation column in a GeoDataFrame.
+
+    Tract-level data carries state abbreviations from NHGIS as 'STUSAB'
+    (kept on the attribute side of the merge); county-level cb shapefiles
+    carry them as 'STUSPS' (on the geometry side) instead. Checking both
+    lets prepare_geodataframe() work with either source without a
+    geography-specific branch.
+
+    Args:
+        gdf: GeoDataFrame to search.
+
+    Returns:
+        Name of the state abbreviation column.
+
+    Raises:
+        ValueError: If no recognized column is found.
+    """
+    candidates = ['STUSAB', 'STUSPS', 'STATE_ABBR', 'STATEABBR']
+
+    for col in candidates:
+        if col in gdf.columns:
+            return col
+
+    raise ValueError(
+        f"No state abbreviation column found. Tried: {candidates}. "
+        f"Available: {list(gdf.columns)}"
+    )
+
+
+def attach_state_abbreviation(
+    gdf_geo: gpd.GeoDataFrame,
+    gdf_states: gpd.GeoDataFrame,
+) -> gpd.GeoDataFrame:
+    """Attach a STUSPS state-abbreviation column via STATEFP.
+
+    Census cartographic boundary (cb) county shapefiles didn't consistently
+    include STUSPS until ~2020 -- the 2015 vintage has only STATEFP (numeric
+    FIPS). This cross-walks STUSPS from a state cb shapefile (which carries
+    it in every vintage) onto any geometry with a STATEFP column, so
+    prepare_geodataframe() can filter/split by state regardless of which
+    county shapefile vintage is used.
+
+    Args:
+        gdf_geo: GeoDataFrame with a STATEFP column (e.g. county boundaries).
+        gdf_states: GeoDataFrame with STATEFP and STUSPS columns (e.g. a
+            Census cb state shapefile).
+
+    Returns:
+        Copy of gdf_geo with a STUSPS column added (overwritten if already
+        present, so results are consistent across vintages).
+    """
+    crosswalk = pd.DataFrame(gdf_states[['STATEFP', 'STUSPS']]).drop_duplicates()
+    result = gdf_geo.drop(columns=['STUSPS'], errors='ignore').merge(
+        crosswalk, on='STATEFP', how='left'
+    )
+    return result
+
+
 def prepare_geodataframe(
     gdf_tracts: gpd.GeoDataFrame,
     df_processed: pd.DataFrame,
     exclude_states: Optional[list] = None,
+    geo_join_col: str = 'GISJOIN',
 ) -> Tuple[gpd.GeoDataFrame, gpd.GeoDataFrame, gpd.GeoDataFrame]:
     """
     Prepare and filter geodataframe for mapping.
-    
-    Merges processed fuel data with tract geometries, applies simplified
-    fuel categories, filters geographic extent, and separates Alaska for
-    inset plotting.
-    
+
+    Merges processed fuel data with tract (or county) geometries, applies
+    simplified fuel categories, filters geographic extent, and separates
+    Alaska for inset plotting.
+
     Args:
-        gdf_tracts: GeoDataFrame containing census tract geometries.
+        gdf_tracts: GeoDataFrame containing tract or county geometries.
         df_processed: DataFrame with processed heating fuel data.
         exclude_states: List of state abbreviations to exclude (e.g., ['HI', 'PR']).
-    
+        geo_join_col: Column name to merge geometries and data on. Defaults
+            to 'GISJOIN' (NHGIS tract/state shapefiles). Pass 'GEOID' when
+            using Census cartographic boundary (cb) shapefiles, which don't
+            include a GISJOIN field -- process_heating_fuel_data_county()
+            produces a matching 5-digit FIPS 'GEOID' column for this.
+
     Returns:
         Tuple of (gdf_full, gdf_conus, gdf_alaska) where:
         - gdf_full: Complete merged geodataframe with filtered states
@@ -437,21 +626,26 @@ def prepare_geodataframe(
     """
     if exclude_states is None:
         exclude_states = ['HI', 'PR']
-    
+
     # Merge geometries with processed data
-    gdf = gdf_tracts.merge(df_processed, on='GISJOIN', how='left')
-    
+    gdf = gdf_tracts.merge(df_processed, on=geo_join_col, how='left')
+
     # Apply simplified fuel categories
     gdf['Dom_Fuel_Simple'] = gdf['Dom_Fuel_Type'].apply(simplify_fuel_categories)
-    
+
     # Assign colors
     gdf['color'] = gdf['Dom_Fuel_Simple'].map(FUEL_COLORS)
-    
+
+    # State abbreviation may come from either side of the merge depending on
+    # geography (STUSAB from NHGIS tract attributes, STUSPS from cb county
+    # geometries) -- detect whichever is present.
+    state_col = _detect_state_column(gdf)
+
     # Filter geographic extent
-    gdf_filtered = gdf[~gdf['STUSAB'].isin(exclude_states)].copy()
-    
+    gdf_filtered = gdf[~gdf[state_col].isin(exclude_states)].copy()
+
     # Separate Alaska for inset
-    gdf_alaska = gdf_filtered[gdf_filtered['STUSAB'] == 'AK'].copy()
-    gdf_conus = gdf_filtered[gdf_filtered['STUSAB'] != 'AK'].copy()
-    
+    gdf_alaska = gdf_filtered[gdf_filtered[state_col] == 'AK'].copy()
+    gdf_conus = gdf_filtered[gdf_filtered[state_col] != 'AK'].copy()
+
     return gdf_filtered, gdf_conus, gdf_alaska

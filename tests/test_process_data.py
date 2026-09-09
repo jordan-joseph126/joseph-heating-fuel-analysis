@@ -8,15 +8,18 @@ import numpy as np
 import pandas as pd
 import geopandas as gpd
 import pytest
+from shapely.geometry import box
 from typing import Dict
 
 from scripts.process_data import (
+    attach_state_abbreviation,
     calculate_cv,
     flag_unreliable_tracts,
     FUEL_COLORS,
     prepare_geodataframe,
     print_cv_summary,
     process_heating_fuel_data,
+    process_heating_fuel_data_county,
     simplify_fuel_categories,
 )
 
@@ -566,6 +569,196 @@ class TestPrepareGeodataframe:
         )
         if "STUSAB" in gdf_filtered.columns:
             assert "CA" not in gdf_filtered["STUSAB"].values
+
+
+# ============================================================================
+# TestProcessHeatingFuelDataCounty
+# ============================================================================
+
+
+class TestProcessHeatingFuelDataCounty:
+    """Tests for the county-level (Census B25040) processing function."""
+
+    def test_returns_dataframe(self, raw_census_county_dataframe: pd.DataFrame) -> None:
+        """Function should return a pandas DataFrame."""
+        result = process_heating_fuel_data_county(raw_census_county_dataframe, 2023)
+        assert isinstance(result, pd.DataFrame)
+
+    def test_column_renaming(self, raw_census_county_dataframe: pd.DataFrame) -> None:
+        """B25040 estimate columns should be renamed to the shared human-readable names."""
+        result = process_heating_fuel_data_county(raw_census_county_dataframe, 2023)
+        for col in ESTIMATE_COLUMNS:
+            assert col in result.columns, f"Missing column {col}"
+
+    def test_moe_columns_present_by_default(self, raw_census_county_dataframe: pd.DataFrame) -> None:
+        """MOE columns should be included by default (include_moe=True)."""
+        result = process_heating_fuel_data_county(raw_census_county_dataframe, 2023)
+        for col in MOE_COLUMNS:
+            assert col in result.columns, f"Missing MOE column: {col}"
+
+    def test_moe_columns_absent_when_disabled(self, raw_census_county_dataframe: pd.DataFrame) -> None:
+        """MOE columns should NOT be present when include_moe=False."""
+        result = process_heating_fuel_data_county(raw_census_county_dataframe, 2023, include_moe=False)
+        for col in MOE_COLUMNS:
+            assert col not in result.columns, f"Unexpected MOE column: {col}"
+
+    def test_same_codes_work_across_years(self, raw_census_county_dataframe: pd.DataFrame) -> None:
+        """Unlike NHGIS, the same B25040 codes should process for any year without error."""
+        for year in (2015, 2020, 2023):
+            result = process_heating_fuel_data_county(raw_census_county_dataframe, year)
+            assert (result["YEAR"] == year).all()
+
+    def test_geoid_extraction(self, raw_census_county_dataframe: pd.DataFrame) -> None:
+        """GEOID should be the 5-digit FIPS from the last 5 characters of GEO_ID."""
+        result = process_heating_fuel_data_county(raw_census_county_dataframe, 2023)
+        # Row 0: GEO_ID=0500000US42001 -> GEOID=42001
+        assert result.iloc[0]["GEOID"] == "42001"
+        assert len(result.iloc[0]["GEOID"]) == 5
+        assert result.iloc[0]["FIPS_Code"] == "42001"
+
+    def test_percentage_calculation_correctness(self, raw_census_county_dataframe: pd.DataFrame) -> None:
+        """Pct_{FUEL} should equal round((FUEL / Total_Housing_Units) * 100, 1)."""
+        result = process_heating_fuel_data_county(raw_census_county_dataframe, 2023)
+        # Row 0: Natural_Gas=700, Total=1000 -> 70.0%
+        assert result.iloc[0]["Pct_Natural_Gas"] == pytest.approx(70.0, abs=0.1)
+
+    def test_dominant_fuel_identification(self, raw_census_county_dataframe: pd.DataFrame) -> None:
+        """Dom_Fuel_Type should be the fuel with the highest count."""
+        result = process_heating_fuel_data_county(raw_census_county_dataframe, 2023)
+        assert result.iloc[0]["Dom_Fuel_Type"] == "Natural_Gas"
+        assert result.iloc[1]["Dom_Fuel_Type"] == "Electricity"
+
+    def test_dominant_fuel_tie_handling(self, raw_census_county_dataframe: pd.DataFrame) -> None:
+        """A two-fuel tie should produce Dom_Fuel_Type='Tie'."""
+        result = process_heating_fuel_data_county(raw_census_county_dataframe, 2023)
+        tie_row = result[result["GEO_ID"] == "0500000US39003"].iloc[0]
+        assert tie_row["Dom_Fuel_Type"] == "Tie"
+        assert bool(tie_row["Has_Dom_Tie"]) is True
+
+    def test_zero_total_flagged_insufficient(self, raw_census_county_dataframe: pd.DataFrame) -> None:
+        """Zero Total_Housing_Units should be flagged Insufficient_Data."""
+        result = process_heating_fuel_data_county(raw_census_county_dataframe, 2023)
+        row = result[result["GEO_ID"] == "0500000US48001"].iloc[0]
+        assert row["Data_Quality_Check"] == "Insufficient_Data"
+        assert row["Dom_Fuel_Type"] == "No_Data"
+
+    def test_nan_total_flagged_insufficient(self, raw_census_county_dataframe: pd.DataFrame) -> None:
+        """NaN Total_Housing_Units should be flagged Insufficient_Data."""
+        result = process_heating_fuel_data_county(raw_census_county_dataframe, 2023)
+        row = result[result["GEO_ID"] == "0500000US06001"].iloc[0]
+        assert row["Data_Quality_Check"] == "Insufficient_Data"
+
+    def test_suppressed_annotation_coerced_to_nan(self, raw_census_county_dataframe: pd.DataFrame) -> None:
+        """Census's '-' suppression flag should coerce to NaN, not raise or stay a string."""
+        result = process_heating_fuel_data_county(raw_census_county_dataframe, 2023)
+        row = result[result["GEO_ID"] == "0500000US04001"].iloc[0]
+        assert pd.isna(row["Total_Housing_Units"])
+        assert row["Data_Quality_Check"] == "Insufficient_Data"
+
+    def test_matches_tract_level_fuel_semantics(self, raw_census_county_dataframe: pd.DataFrame) -> None:
+        """County percentages should sum to ~100% for valid counties, same as tract-level."""
+        result = process_heating_fuel_data_county(raw_census_county_dataframe, 2023)
+        valid = result[result["Data_Quality_Check"] == "Valid_Data"]
+        pct_sum = valid[PCT_COLUMNS].sum(axis=1)
+        for idx, val in pct_sum.items():
+            assert val == pytest.approx(100.0, abs=1.0), f"Row {idx}: percentages sum to {val}"
+
+
+# ============================================================================
+# TestAttachStateAbbreviation
+# ============================================================================
+
+
+class TestAttachStateAbbreviation:
+    """Tests for the STUSPS crosswalk helper (needed for 2015-vintage cb files)."""
+
+    def test_adds_stusps_column(
+        self, mock_county_gdf: gpd.GeoDataFrame, mock_state_cb_gdf: gpd.GeoDataFrame
+    ) -> None:
+        """Output should have a STUSPS column even when the input lacks one."""
+        assert "STUSPS" not in mock_county_gdf.columns
+        result = attach_state_abbreviation(mock_county_gdf, mock_state_cb_gdf)
+        assert "STUSPS" in result.columns
+
+    def test_correct_state_abbreviation_assigned(
+        self, mock_county_gdf: gpd.GeoDataFrame, mock_state_cb_gdf: gpd.GeoDataFrame
+    ) -> None:
+        """Each county should get the STUSPS matching its STATEFP."""
+        result = attach_state_abbreviation(mock_county_gdf, mock_state_cb_gdf)
+        row = result[result["GEOID"] == "42001"].iloc[0]
+        assert row["STUSPS"] == "PA"
+
+    def test_preserves_row_count(
+        self, mock_county_gdf: gpd.GeoDataFrame, mock_state_cb_gdf: gpd.GeoDataFrame
+    ) -> None:
+        """Should not add or drop rows."""
+        result = attach_state_abbreviation(mock_county_gdf, mock_state_cb_gdf)
+        assert len(result) == len(mock_county_gdf)
+
+    def test_overwrites_existing_stusps(self, mock_state_cb_gdf: gpd.GeoDataFrame) -> None:
+        """Should overwrite (not duplicate) an existing STUSPS column."""
+        gdf_with_stusps = gpd.GeoDataFrame(
+            {"GEOID": ["42001"], "STATEFP": ["42"], "STUSPS": ["WRONG"]},
+            geometry=[box(0, 0, 1, 1)],
+            crs="EPSG:5070",
+        )
+        result = attach_state_abbreviation(gdf_with_stusps, mock_state_cb_gdf)
+        assert result["STUSPS"].iloc[0] == "PA"
+        assert list(result.columns).count("STUSPS") == 1
+
+
+# ============================================================================
+# TestPrepareGeodataframeCounty
+# ============================================================================
+
+
+class TestPrepareGeodataframeCounty:
+    """Tests for prepare_geodataframe() with county-level (GEOID-joined) inputs."""
+
+    @pytest.fixture
+    def county_gdf_with_state(
+        self, mock_county_gdf: gpd.GeoDataFrame, mock_state_cb_gdf: gpd.GeoDataFrame
+    ) -> gpd.GeoDataFrame:
+        return attach_state_abbreviation(mock_county_gdf, mock_state_cb_gdf)
+
+    def test_merges_on_geoid(
+        self, county_gdf_with_state: gpd.GeoDataFrame, processed_county_dataframe: pd.DataFrame
+    ) -> None:
+        """Passing geo_join_col='GEOID' should merge county data correctly."""
+        gdf_filtered, _, _ = prepare_geodataframe(
+            county_gdf_with_state, processed_county_dataframe, geo_join_col="GEOID"
+        )
+        assert "Dom_Fuel_Type" in gdf_filtered.columns
+        matched = gdf_filtered["Dom_Fuel_Type"].notna().sum()
+        assert matched > 0
+
+    def test_uses_stusps_for_state_filtering(
+        self, county_gdf_with_state: gpd.GeoDataFrame, processed_county_dataframe: pd.DataFrame
+    ) -> None:
+        """State filtering should work off STUSPS when GISJOIN/STUSAB aren't present."""
+        gdf_filtered, _, _ = prepare_geodataframe(
+            county_gdf_with_state, processed_county_dataframe, geo_join_col="GEOID"
+        )
+        assert "HI" not in gdf_filtered["STUSPS"].values
+
+    def test_alaska_split_with_stusps(
+        self, county_gdf_with_state: gpd.GeoDataFrame, processed_county_dataframe: pd.DataFrame
+    ) -> None:
+        """gdf_alaska should contain only STUSPS == 'AK' rows."""
+        _, gdf_conus, gdf_alaska = prepare_geodataframe(
+            county_gdf_with_state, processed_county_dataframe, geo_join_col="GEOID"
+        )
+        if len(gdf_alaska) > 0:
+            assert (gdf_alaska["STUSPS"] == "AK").all()
+        assert "AK" not in gdf_conus["STUSPS"].values
+
+    def test_raises_without_any_state_column(self, processed_county_dataframe: pd.DataFrame) -> None:
+        """Should raise ValueError if neither STUSAB nor STUSPS is present anywhere."""
+        gdf_no_state = gpd.GeoDataFrame(
+            {"GEOID": ["42001"]}, geometry=[box(0, 0, 1, 1)], crs="EPSG:5070"
+        )
+        with pytest.raises(ValueError, match="state abbreviation"):
+            prepare_geodataframe(gdf_no_state, processed_county_dataframe, geo_join_col="GEOID")
 
 
 # ============================================================================

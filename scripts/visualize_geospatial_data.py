@@ -1,8 +1,10 @@
 """
 Heating Fuel Choropleth Mapping Functions
 
-Creates census tract-level maps showing primary heating fuel usage across the US.
-Handles standard layout with Alaska inset and customizable positioning.
+Creates choropleth maps showing primary heating fuel usage across the US, at
+either census tract or county level (pass geography_label='County' for the
+latter). Handles standard layout with Alaska inset and customizable
+positioning.
 """
 import os
 from typing import List, Tuple, Optional, Dict
@@ -50,23 +52,33 @@ def detect_state_column(gdf: gpd.GeoDataFrame) -> str:
 
 
 def split_state_boundaries(
-    gdf_states: gpd.GeoDataFrame
+    gdf_states: gpd.GeoDataFrame,
+    exclude_from_conus: Optional[List[str]] = None
 ) -> Tuple[gpd.GeoDataFrame, gpd.GeoDataFrame]:
     """
     Split state boundaries into CONUS and Alaska for mapping.
-    
+
     Args:
         gdf_states: GeoDataFrame with all state boundaries
-        
+        exclude_from_conus: State abbreviations to drop from the CONUS panel
+            besides Alaska (which always gets its own inset). Defaults to
+            ['HI', 'PR', 'AS', 'GU', 'MP', 'VI'] -- NHGIS's tract-level state
+            shapefile never included the Pacific/Caribbean territories, but
+            Census's own cb state shapefiles (used for the county-level
+            analysis) do, so they're excluded by default here too.
+
     Returns:
         Tuple of (state_conus, state_alaska) GeoDataFrames
-        
+
     Raises:
         ValueError: If state column not found
     """
+    if exclude_from_conus is None:
+        exclude_from_conus = ['HI', 'PR', 'AS', 'GU', 'MP', 'VI']
+
     state_col = detect_state_column(gdf_states)
-    
-    state_conus = gdf_states[~gdf_states[state_col].isin(['AK', 'HI', 'PR'])]
+
+    state_conus = gdf_states[~gdf_states[state_col].isin(['AK'] + exclude_from_conus)]
     state_alaska = gdf_states[gdf_states[state_col] == 'AK']
     
     return state_conus, state_alaska
@@ -138,21 +150,24 @@ def plot_heating_fuel_map(
     ax_main: plt.Axes,
     ax_alaska: Optional[plt.Axes] = None,
     show_title: bool = True,
-    verbose: bool = False
+    verbose: bool = False,
+    geography_label: str = 'Census Tract'
 ) -> None:
     """
     Render heating fuel choropleth on provided axes.
-    
+
     Args:
-        gdf_conus: Contiguous US tracts with 'color' column
-        gdf_alaska: Alaska tracts with 'color' column
+        gdf_conus: Contiguous US tracts (or counties) with 'color' column
+        gdf_alaska: Alaska tracts (or counties) with 'color' column
         gdf_states: State boundaries (matching CRS)
         year: Data year for title
         ax_main: Main map axes
         ax_alaska: Optional Alaska inset axes
         show_title: Whether to add title
         verbose: Print rendering progress
-        
+        geography_label: Geography name shown in the title (e.g. 'Census
+            Tract' or 'County').
+
     Raises:
         ValueError: If CRS doesn't match between inputs
     """
@@ -167,7 +182,7 @@ def plot_heating_fuel_map(
     
     # Plot contiguous US
     if verbose:
-        print(f"  Rendering CONUS: {len(gdf_conus):,} tracts")
+        print(f"  Rendering CONUS: {len(gdf_conus):,} {geography_label.lower()} polygons")
     
     gdf_conus.plot(
         ax=ax_main,
@@ -190,17 +205,17 @@ def plot_heating_fuel_map(
     if show_title:
         ax_main.text(
             0.5, 0.97,
-            f'Primary Heating Fuel by Census Tract, {year}',
+            f'Primary Heating Fuel by {geography_label}, {year}',
             transform=ax_main.transAxes,
             ha='center',
             fontsize=24,
             fontweight='bold'
         )
-    
+
     # Plot Alaska inset if provided
     if ax_alaska is not None:
         if verbose:
-            print(f"  Rendering Alaska: {len(gdf_alaska):,} tracts")
+            print(f"  Rendering Alaska: {len(gdf_alaska):,} {geography_label.lower()} polygons")
         
         gdf_alaska.plot(
             ax=ax_alaska,
@@ -235,66 +250,91 @@ def plot_heating_fuel_map(
 
 def create_heating_fuel_map(
     gdf_conus: gpd.GeoDataFrame,
-    gdf_alaska: gpd.GeoDataFrame,
+    gdf_alaska: Optional[gpd.GeoDataFrame],
     gdf_states: gpd.GeoDataFrame,
     year: int,
     output_dir: str,
     show_plot: bool = True,
     dpi: int = 600,
-    verbose: bool = False
+    verbose: bool = False,
+    geography_label: str = 'Census Tract',
+    include_alaska: bool = True
 ) -> Tuple[str, str]:
     """
     Create and save complete heating fuel map with standard layout.
-    
+
     Args:
-        gdf_conus: Contiguous US tracts with 'color' column
-        gdf_alaska: Alaska tracts with 'color' column
+        gdf_conus: Contiguous US tracts (or counties) with 'color' column
+        gdf_alaska: Alaska tracts (or counties) with 'color' column. May be
+            None when include_alaska=False.
         gdf_states: State boundaries
         year: Data year
         output_dir: Directory for output files
         show_plot: Display plot after creation
         dpi: PNG resolution
         verbose: Print progress messages
-        
+        geography_label: Geography name shown in the title and legend (e.g.
+            'Census Tract' or 'County').
+        include_alaska: Whether to render the Alaska inset. When False, the
+            main map expands to use the space the inset would have occupied
+            and gdf_alaska is ignored even if provided.
+
     Returns:
         Tuple of (png_path, pdf_path)
     """
     os.makedirs(output_dir, exist_ok=True)
-    
+
     # Create figure with standard layout
     fig = plt.figure(figsize=(20, 11), facecolor='white')
-    
-    # Main map: 2% left margin, 75% width, 80% height
-    ax_main = plt.axes([0.02, 0.15, 0.75, 0.80])
-    
-    # Alaska inset: bottom-left corner
-    ax_alaska = plt.axes([0.02, 0.15, 0.22, 0.25])
-    
+
+    if include_alaska:
+        # Main map: 2% left margin, 75% width, 80% height
+        ax_main = plt.axes([0.02, 0.15, 0.75, 0.80])
+        # Alaska inset: bottom-left corner
+        ax_alaska = plt.axes([0.02, 0.15, 0.22, 0.25])
+    else:
+        # No inset to reserve space for -- expand to fill nearly the whole
+        # figure, and trim matplotlib's default 5% autoscale margin
+        # (axes.xmargin/ymargin) so the map isn't padded with blank space on
+        # every side before the legend (bottom-right corner, below) is placed.
+        ax_main = plt.axes([0.0, 0.05, 0.90, 0.90])
+        ax_main.margins(0.01)
+        ax_alaska = None
+
     # Render map layers
     plot_heating_fuel_map(
         gdf_conus=gdf_conus,
-        gdf_alaska=gdf_alaska,
+        gdf_alaska=gdf_alaska if include_alaska else None,
         gdf_states=gdf_states,
         year=year,
         ax_main=ax_main,
         ax_alaska=ax_alaska,
         show_title=True,
-        verbose=verbose
+        verbose=verbose,
+        geography_label=geography_label
     )
-    
+
     # Add legend (positioned in figure coordinates for precision)
     fig.legend(
         handles=create_legend_elements(),
-        title='Primary Heating Fuel\n(by census tract)',
-        loc='center right',
-        # Moved legend lower to allow for larger text and avoid overlap. Originally (0.80, 0.55)
-        bbox_to_anchor=(0.78, 0.30),
+        title=f'Primary Heating Fuel\n(by {geography_label.lower()})',
+        # With the Alaska inset, 'center right' at (0.78, 0.30) sits below the
+        # CONUS shape's right edge. Without it, the main map fills nearly the
+        # whole figure (see ax_main above), so the legend goes in the
+        # bottom-right corner instead, clear of the Northeast coastline.
+        loc='center right' if include_alaska else 'lower right',
+        bbox_to_anchor=(0.78, 0.30) if include_alaska else (0.91, 0.03),
         bbox_transform=fig.transFigure,
-        # Increased from 11 to 16, and title from 12 to 17
-        fontsize=16,              
-        title_fontsize=17,
+        # Increased from 11 to 16, and title from 12 to 17 (18/20 without the
+        # Alaska inset, where the legend has more room to itself)
+        fontsize=16 if include_alaska else 18,
+        title_fontsize=17 if include_alaska else 20,
         frameon=True,
-        edgecolor='black'
+        edgecolor='black',
+        # Fully opaque -- matplotlib's default framealpha=0.8 let the map
+        # show faintly through the legend box when the two sit close together.
+        facecolor='white',
+        framealpha=1.0
     )
     
     # Save outputs (SIMPLIFIED - single function call)
@@ -320,11 +360,12 @@ def create_heating_fuel_grid(
     include_alaska: bool = True,
     figsize: Tuple[int, int] = (30, 10),
     dpi: int = 600,
-    verbose: bool = False
+    verbose: bool = False,
+    geography_label: str = 'Census Tract'
 ) -> Tuple[str, str]:
     """
     Create horizontal grid of heating fuel maps for multiple years.
-    
+
     Args:
         gdf_dict: Nested dict like {2015: {'conus': gdf, 'alaska': gdf}, ...}
         gdf_states: GeoDataFrame with state boundaries
@@ -334,7 +375,9 @@ def create_heating_fuel_grid(
         figsize: Figure size (width, height) in inches
         dpi: Resolution for PNG output
         verbose: Print progress messages
-        
+        geography_label: Geography name shown in the title and legend (e.g.
+            'Census Tract' or 'County').
+
     Returns:
         Tuple of (png_path, pdf_path) for saved files
         
@@ -430,15 +473,16 @@ def create_heating_fuel_grid(
             ax_main=axes_main[i],
             ax_alaska=axes_alaska[i],
             show_title=True,
-            verbose=verbose
+            verbose=verbose,
+            geography_label=geography_label
         )
-    
+
     # ============================================================
     # ADD SHARED LEGEND (horizontal at bottom)
     # ============================================================
     fig.legend(
         handles=create_legend_elements(),
-        title='Primary Heating Fuel (by census tract)',
+        title=f'Primary Heating Fuel (by {geography_label.lower()})',
         loc='lower center',
         bbox_to_anchor=(0.5, -0.01),
         ncol=7,
